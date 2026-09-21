@@ -1,0 +1,268 @@
+Buraaq Language — Concurrency Report
+======================================
+Generated: 2026-09-21 (UTC)
+Repository: Buraaq programming language
+
+This report summarizes how Buraaq handles concurrency: design (ADRs), programming
+model, safety, standard library, runtime implementation, benchmarks, roadmap,
+and comparison to other languages.
+
+
+1. DESIGN GOALS
+---------------
+
+Buraaq aims for concurrency that is:
+  - Easier than C++ (structured spawn, less manual thread-pool code)
+  - Less conceptually intrusive than async/await everywhere (no "colored functions"
+    infecting parsers, drivers, and game loops)
+  - Compatible with a zero-GC ownership model (Go-style goroutines + GC were rejected)
+
+Key architecture decision records (docs/adr/):
+  - ADR 0004: Opt-In Async Task Model (Accepted)
+  - ADR 0009: Threads + Structured Parallelism + Send/Sync Inference (Accepted)
+  - ADR 0012: Unified Concurrency — spawn + Implicit Suspension (Accepted)
+
+ADR 0012 supersedes the split mental model called out in ADR 0004's disadvantages
+for surface syntax: one user-facing API, compiler-chosen execution strategy.
+
+
+2. PROGRAMMING MODEL
+--------------------
+
+2.1 Unified spawn (target surface — ADR 0012)
+
+Programmers write:
+
+    spawn {
+        process_request()
+    }
+
+    body = fetch("https://example.com/api")
+
+The compiler classifies each function and call site:
+
+  Context                          | spawn { cpu work }      | fetch(url)              | sleep(ms)
+  ---------------------------------|-------------------------|-------------------------|------------------
+  Sync function (default)          | OS thread + JoinHandle  | Blocks calling thread   | Blocks
+  Task context (suspending spawn)  | Lightweight pool task   | Yields; reactor I/O     | Timer wheel yield
+  parallel for body                | Work-stealing pool task | Same as task context    | Same
+
+No async fn is required for typical network code in this model. async fn remains
+opt-in for library authors who want explicit Task[T] boundaries.
+
+2.2 Explicit async (ADR 0004 — complementary / legacy boundary)
+
+  - async: blocks produce lazy Task[T] (not started until await or spawn_task).
+  - await blocks the current thread on completion (thread pool + I/O multiplexer
+    under the hood when fully implemented).
+  - spawn_task async: ... schedules on the runtime immediately.
+  - Synchronous functions cannot await; callers of sync functions never change.
+
+Bridge pattern:
+
+    fn handle_sync(conn: TcpStream):
+        spawn_task async:
+            await handle_async(conn)
+
+    async fn handle_async(conn: TcpStream) throws IOError:
+        ...
+
+Compiler/lexer already recognize async, await, spawn, spawn_task (bootstrap compiler,
+selftests).
+
+2.3 Structured concurrency
+
+  - Every spawn returns JoinHandle[T]; dropping without join is a warning (future:
+    error under #![deny(unstructured_concurrency)]).
+  - parallel for lowers to a scoped task group with a barrier.
+  - Task groups nest: parent cannot complete until children complete (thread-local
+    join stack).
+  - CancelToken propagated into I/O waits; timeouts (e.g. fetch with timeout).
+  - Parent task group cancel cascades to children.
+
+2.4 Structured parallelism (ADR 0009)
+
+    parallel for item in items:
+        process(item)
+
+Lowers to thread-pool fork-join with deterministic barrier before continuation.
+Chunk size tuned by runtime (num_cpus aware).
+
+
+3. MEMORY SAFETY ACROSS THREADS
+-------------------------------
+
+Send and Sync are compiler-inferred; users do not write Send/Sync except for
+unsafe FFI wrappers.
+
+Rules (internal — ADR 0009):
+
+  Type        | Send              | Sync
+  ------------|-------------------|---------------------------
+  i32, f64, bool, etc. | auto       | auto
+  ref T       | never             | if T: Sync
+  Mutex[T]    | if T: Send        | yes
+  Rc[T]       | no                | no
+  Arc[T]      | if T: Send        | if T: Send
+
+Cross-thread capture of non-Send values should be rejected at compile time with
+capture-chain diagnostics (E04xx). Full GFA Send checks are on the v0.7b roadmap.
+Debug builds may use TSan (--sanitize thread per ADR 0009).
+
+Mutex / channels (intended API — ADR 0009):
+
+    lock = Mutex.new(data)
+    guard = lock.lock()
+    guard.field = 42
+    # guard dropped -> unlock
+
+    ch = Channel[T].bounded(64)
+    ch.send(value)?
+    v = ch.recv()?
+
+
+4. STANDARD LIBRARY
+-------------------
+
+Module          | Role
+----------------|--------------------------------------------------
+std.thread      | OS threads, JoinHandle, runtime init
+std.async       | Work-stealing executor: runtime_start, yield_now
+std.sync        | Mutex, Channel[T], atomics (FFI to C runtime)
+
+Related: std.stream, std.grid, std.lumen, std.service for servers and parallel
+patterns. Demo demos/multithreaded-server/ is scaffold; benchmarks live under
+benchmarks/harness/.
+
+
+5. RUNTIME ARCHITECTURE (IMPLEMENTATION)
+----------------------------------------
+
+Primary implementation: stdlib/runtime/buraaq_runtime.c
+Header: stdlib/runtime/buraaq_runtime.h
+
+Described as: small, native, zero-GC — work-stealing executor, OS threads,
+channels, atomics, cancellation.
+
+Layer diagram:
+
+    Buraaq program (compiled user code)
+        Compiler: effect analysis -> spawn kind (OS thread vs pool vs coroutine)
+        buraaq_runtime.c
+            OS thread wrapper (pthread / Win32)
+            Work-stealing executor (N workers; 0 workers = auto num CPUs)
+            Reactor (poll/epoll / IOCP stub v1; full backend v0.8)
+            Channels, mutex, atomics
+            Timer wheel (timeouts — planned integration)
+            Cancel tokens + task groups
+
+Public C API (summary):
+  - buraaq_runtime_init / shutdown / worker_count
+  - buraaq_os_thread_spawn / join
+  - buraaq_task_submit / join / done / yield
+  - buraaq_task_group_new / add / wait / free
+  - buraaq_channel_bounded / send / recv / close / free
+  - buraaq_atomic_int_* 
+  - buraaq_cancel_token_*
+  - buraaq_runtime_sleep_ms / wait_timeout
+  - buraaq_fetch_async / buraaq_fetch_blocking (v1 stub)
+
+Implementation notes (current code):
+  - Executor uses mutex-backed deques for local job queues (lock-free upgrade planned).
+  - buraaq_task_yield() uses sched_yield() / Sleep(0) — not full coroutine suspension.
+  - Channels: bounded, mutex + condition variables; v1 payload int64 in C layer.
+  - Async I/O: buraaq_fetch_blocking returns fixed stub JSON; async callback invokes
+    synchronously — reactor/io_uring/IOCP deferred to v0.8.
+  - Runtime linked when concurrency is used (v0.7 dev: buraaq build may always link;
+    future: dead-strip unused).
+
+
+6. MATURITY AND ROADMAP
+-----------------------
+
+Phase   | Deliverable                                      | Status
+--------|--------------------------------------------------|------------------
+v0.7a   | C runtime, benchmarks, design docs, stdlib FFI   | Present in repo
+v0.7b   | MIR spawn -> runtime; GFA Send checks            | Planned / in progress
+v0.7c   | Implicit fetch suspension in task contexts       | Planned
+v0.8    | io_uring / IOCP reactor; real TCP async          | Planned
+
+Examples (examples/engineer-suite/single/15_spawn_worker.bq) show spawn { } syntax;
+full compiler lowering to unified model continues through compiler pipeline.
+
+
+7. BENCHMARKS
+-------------
+
+Methodology: docs/benchmarks/CONCURRENCY.md
+Harness: benchmarks/harness/ (links buraaq_runtime.c + buraaq_std.c)
+
+Shipped in v0.7a:
+
+  Benchmark           | Metric  | Description
+  --------------------|---------|--------------------------------------------
+  task_spawn          | ns/op   | Submit + join empty task (50,000 iters)
+  channel_ping        | ns/op   | Bounded channel send+recv (200k, cap=256)
+  mutex_contention    | ns/op   | Lock/inc/unlock, single thread (500k iters)
+  context_switch      | ns/op   | Two tasks ping-pong cap-1 channel (100k rounds)
+
+Planned v0.8+: tcp_throughput, http_throughput, multi_core_scaling, async_file_io.
+
+Reproduce (Windows script in repo):
+
+    cd benchmarks
+    .\run.ps1              # debug / -O0
+    .\run.ps1 -Release     # release / -O2
+
+Output format: BENCH|<name>|iters=<N>|total_sec=<S>|per_op_ns=<NS>
+
+Fairness: Buraaq task_spawn uses work-stealing pool; Rust/Go/C++/Zig refs often
+use OS threads for the same benchmark — compare spawn costs accordingly until
+task_spawn_pool_* comparison exists.
+
+Published absolute numbers are not checked in; run locally on your hardware and
+record CPU/OS/compiler versions per CONCURRENCY.md.
+
+
+8. DESIGN ALTERNATIVES REJECTED (ADR 0012)
+------------------------------------------
+
+  Alternative                         | Reason rejected
+  ------------------------------------|------------------------------------------
+  JS-style async/await everywhere     | Colored functions; infects kernels/parsers
+  Rust async state machines as default| Pin, Future, .await noise
+  Go goroutines + GC                  | Violates zero-GC ownership model
+  C++ std::async only                 | No structured concurrency; thread leaks
+
+
+9. COMPARISON SUMMARY
+---------------------
+
+Buraaq combines:
+  - Script-like spawn and parallel for
+  - Optional explicit async/await at boundaries (ADR 0004)
+  - Unified surface with compiler-chosen OS thread vs pool task (ADR 0012)
+  - Rust-like inferred Send/Sync without surface trait bounds (ADR 0009)
+
+The gap between documented design and production behavior is mainly:
+  compiler effect analysis and Send enforcement (v0.7b+),
+  implicit suspension for I/O in task contexts (v0.7c),
+  real reactor-backed networking (v0.8).
+
+
+10. REFERENCES IN REPOSITORY
+----------------------------
+
+  docs/adr/0004-async-task-model.md
+  docs/adr/0009-concurrency-model.md
+  docs/adr/0012-unified-concurrency.md
+  docs/benchmarks/CONCURRENCY.md
+  stdlib/runtime/buraaq_runtime.c
+  stdlib/runtime/buraaq_runtime.h
+  stdlib/src/async.bq
+  stdlib/src/thread.bq
+  stdlib/src/sync.bq
+  stdlib/tests/support/test_runtime_concurrency.c
+  benchmarks/harness/buraaq_*.c
+
+End of report.
