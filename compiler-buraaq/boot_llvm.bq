@@ -1,0 +1,12 @@
+# Entry point for the bootstrap fixpoint: emit LLVM IR for one file.
+#
+# It lives outside `src/` so the host does not compile it as a second `main`
+# alongside src/main.bq. The guest finds `llvm` and its dependencies under
+# `src/`, which is what makes this a real module resolution rather than a file
+# concatenated by the build script.
+use llvm.dump_llvm
+use std.os.arg
+
+fn main() {
+    dump_llvm(arg(1))
+}

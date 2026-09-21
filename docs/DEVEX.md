@@ -33,18 +33,20 @@ No `Buraaq.toml` unless you outgrow defaults — **`buraaq.pkg`** is the single 
 
 ## Commands
 
+The installed compiler (`dist/buraaq`) is self-hosted:
+
 | Command | Description |
 |---------|-------------|
-| `buraaq new NAME` | Scaffold project |
-| `buraaq build [--release]` | Compile → `target/debug/NAME` |
-| `buraaq run [--release]` | Build + execute |
-| `buraaq test` | Run `test "…" { expect … }` |
-| `buraaq bench` | Discover benchmarks in `benches/` |
-| `buraaq add postgres [^0.1]` | Add dependency + lock |
-| `buraaq remove postgres` | Remove dependency |
-| `buraaq format` | Official formatter (4 spaces, LF) |
-| `buraaq check` | Parse + typecheck all modules |
-| `buraaq doc` | HTML API docs with search |
+| `buraaq` / `repl` / `shell` | Interactive shell (clang per line) |
+| `buraaq -e SNIPPET` | Compile and run a one-liner |
+| `buraaq script FILE.bq` | Compile and run a file |
+| `buraaq new NAME [--cli]` | Scaffold a CLI project |
+| `buraaq run [FILE.bq]` | Build + execute |
+| `buraaq build [FILE.bq [OUT]]` | Compile to a native binary |
+| `buraaq test [FILE.bq]` | Run selftest or a file |
+| `buraaq doctor` | Clang, runtime, scripting line |
+| `buraaq --version` | `buraaq 1.0.0 (self-hosted)` |
+| `buraaq -C DIR <cmd>` | Run the command in that directory |
 
 Legacy single-file mode still works: `buraaq build app.bq`.
 

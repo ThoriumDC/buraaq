@@ -1,5 +1,5 @@
 # Install the Buraaq compiler onto PATH (Windows).
-# One step. Rust is not required. Prefers the packaged dist\buraaq.exe.
+# One step. Prefers the packaged dist\buraaq.exe.
 # LLVM: scripts\ensure-llvm.ps1 if clang is missing.
 # Usage: .\install.ps1 [-Prefix C:\Users\you\bin]
 param(
@@ -11,18 +11,15 @@ $Root = $PSScriptRoot
 New-Item -ItemType Directory -Force -Path $Prefix | Out-Null
 
 $prebuilt = Join-Path $Root "dist\buraaq.exe"
-$already = Join-Path $Root "compiler\target\release\buraaq.exe"
 $src = $null
 if (Test-Path $prebuilt) {
     $src = $prebuilt
-} elseif (Test-Path $already) {
-    $src = $already
 }
 if (-not $src) {
-    throw "Packaged compiler missing (dist\buraaq.exe). Rust is not required to use Buraaq. Get a packaged tree, or on a packager machine run: .\scripts\pack-dist.ps1"
+    throw "Packaged compiler missing (dist\buraaq.exe). Get a packaged tree, or on a packager machine run: .\scripts\pack-dist.ps1"
 }
 
-Write-Host "Using packaged compiler $src (Rust is not required)"
+Write-Host "Using packaged compiler $src"
 $dst = Join-Path $Prefix "buraaq.exe"
 $sidecar = Join-Path $Prefix "buraaq1.exe"
 # Always refresh sidecar first (PowerShell prefers .exe over .cmd; LSP often locks buraaq.exe).
@@ -73,8 +70,6 @@ foreach ($part in @("src", "runtime")) {
 }
 $pkg = Join-Path $stdlib "buraaq.pkg"
 if (Test-Path $pkg) { Copy-Item -Force $pkg (Join-Path $sys "buraaq.pkg") }
-$rt = Join-Path $Root "compiler\runtime\buraaq_rt.c"
-if (Test-Path $rt) { Copy-Item -Force $rt (Join-Path $sys "runtime\buraaq_rt.c") }
 Write-Host "Installed sysroot $sys"
 
 $ensure = Join-Path $Root "scripts\ensure-llvm.ps1"
@@ -100,6 +95,5 @@ $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [En
 Write-Host ""
 Write-Host "Open a new terminal, then:"
 Write-Host "  buraaq --version"
-Write-Host "  buraaq ai doctor"
-Write-Host "  buraaq            # interactive shell"
-Write-Host "Rust was not required."
+Write-Host "  buraaq doctor"
+Write-Host "  buraaq run FILE.bq"

@@ -6,7 +6,7 @@ The first Buraaq standard library — small surface area, **one obvious way** fo
 
 | Path | Module | Purpose |
 |------|--------|---------|
-| `src/io.bq` | `std.io` | Console output |
+| `src/io.bq` | `std.io` | Console I/O (`print`, `read_line`) |
 | `src/fs.bq` | `std.fs` | Files: read / write / exists |
 | `src/text.bq` | `std.text` | String helpers |
 | `src/math.bq` | `std.math` | scalars: trig, log, pow, pi |
@@ -35,11 +35,25 @@ The first Buraaq standard library — small surface area, **one obvious way** fo
 
 ## Tests & benchmarks
 
-```bash
-cd stdlib
-cargo test          # parse all modules + C runtime unit tests
-cargo bench         # allocation benchmark (text concat)
+C runtime unit tests link the whole runtime, because `buraaq_std.c` calls into
+the grid, hold, stream, and server translation units.
+
+```powershell
+# Windows
+$rts = (Get-ChildItem runtime\*.c | Where-Object { $_.Name -ne "buraaq_runtime.c" }).FullName
+clang -I runtime tests\support\test_runtime.c @rts -o test_runtime.exe `
+  -D_CRT_SECURE_NO_WARNINGS -lwininet -ladvapi32 -lws2_32 -lgdi32 -luser32 -lcomctl32 -lshell32 -lole32 -loleaut32
+.\test_runtime.exe
 ```
+
+```bash
+# POSIX
+clang -I runtime tests/support/test_runtime.c $(ls runtime/*.c | grep -v buraaq_runtime.c) \
+  -o test_runtime -lpthread -lm && ./test_runtime
+```
+
+`tests/support/test_runtime_concurrency.c` additionally needs
+`runtime/buraaq_runtime.c`. Both binaries exit 0 on success.
 
 ## Design principles
 

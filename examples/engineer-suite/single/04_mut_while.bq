@@ -4,7 +4,7 @@ use std.io.println
 fn main() {
     mut n = 5
     while n > 0 {
-        println(n.to_text())
+        println(n)
         n = n - 1
     }
 }

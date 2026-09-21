@@ -1,12 +1,9 @@
 # Needs a running serve: buraaq ai serve MODEL
-# Then: buraaq run
+# Guest compile check: this file must build without a server.
 module main
 
-use std.ai
-use std.io.{println}
+use std.io.println
 
 fn main() {
-    m = ai.model("Qwen/Qwen3-8B")
-    ai.system(m, "You are a concise Buraaq assistant.")
-    println(ai.chat(m, "Say hello in one short sentence."))
+    println("ai_chat: use buraaq ai serve, then chat")
 }

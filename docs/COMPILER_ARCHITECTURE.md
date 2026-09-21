@@ -12,7 +12,7 @@ The Buraaq compiler (`buraaq`) is a multi-phase, incrementally compiled, LLVM-ba
 | Clear errors | Source-span tracking from lexer through MIR; structured suggestions |
 | Safe semantics | Guarded Flow Analysis on MIR before codegen |
 | Predictable output | Monomorphized generics; minimal runtime |
-| Single entry point | Driver subcommands: `build`, `test`, `fmt`, `doc`, `get`, `bind`, `explain` |
+| Single entry point | Driver subcommands: `run`, `build`, `test`, `doctor`, `script`, `-e`, shell |
 
 ---
 
@@ -30,25 +30,18 @@ The Buraaq compiler (`buraaq`) is a multi-phase, incrementally compiled, LLVM-ba
  resolver                       harness
 ```
 
-### 2.1 Compiler crate graph (implementation)
+### 2.1 Compiler modules (implementation)
 
-| Crate | Responsibility |
-|-------|----------------|
-| `buraaq_lexer` | UTF-8 lex + indent tokens |
-| `buraaq_parser` | Recursive descent → AST |
-| `buraaq_ast` | AST definitions + span info |
-| `buraaq_resolve` | Module graph, imports, name binding |
-| `buraaq_hir` | Desugared IR (throws, async, methods) |
-| `buraaq_typeck` | Type inference + trait resolution |
-| `buraaq_mir` | Mid-level IR + monomorphization |
-| `buraaq_gfa` | Guarded Flow Analysis (borrow/send) |
-| `buraaq_codegen_llvm` | MIR → LLVM IR |
-| `buraaq_driver` | CLI, incremental cache, linker invoke |
-| `buraaq_lsp` | Language Server Protocol |
-| `buraaq_fmt` | Opinionated formatter |
-| `buraaq_pkg` | Manifest/lockfile/resolver |
+| Module | Responsibility |
+|--------|----------------|
+| `src/lexer.bq` | UTF-8 lex + indent tokens |
+| `src/parser.bq` | Recursive descent → AST events |
+| `src/names.bq` | Module graph, imports, name binding |
+| `src/mir.bq` | Mid-level IR subset |
+| `src/llvm.bq` | MIR → LLVM IR text |
+| `src/main.bq` | CLI: `new` / `run` / `build` / `test` / `doctor` / `script` / `-e` / shell |
 
-Bootstrap: compiler written in Buraaq after stage0 (Rust or C bootstrap compiler—see ROADMAP).
+Bootstrap: the product compiler is `compiler-buraaq/`, seeded by `boot/stage0.ll` + clang. Track: [BOOTSTRAP.md](BOOTSTRAP.md).
 
 ---
 
@@ -298,6 +291,31 @@ Driver downloads standard library built for target + LLVM target support check. 
 
 Dead code elimination strips unused runtime modules.
 
+### Which C runtimes get compiled
+
+`buraaq_rt.c` (printing, allocation, conversions) and `buraaq_std.c` (text, file,
+math, os, time, process) are the base and always link. The rest are feature
+runtimes: UI (`buraaq_lumen.c`), server and Postgres (`buraaq_server.c`),
+threads and channels (`buraaq_runtime.c`), matrices (`buraaq_grid.c`),
+dataframes (`buraaq_hold.c`), sockets (`buraaq_stream.c`), boards
+(`buraaq_board.c`), flowdesk, and the AI client.
+
+`runtime_paths_for` in `driver/src/compile.rs` picks a feature runtime only when
+the emitted module references one of the symbols it owns. Every module
+*declares* all runtime symbols, so `declare` lines are skipped and only call
+sites count. Each entry is keyed by the symbol prefixes it exclusively owns —
+`buraaq_std.c` owns `buraaq_http_get_body` while `buraaq_server.c` owns the other
+`buraaq_http_*` symbols, so the server entry lists its HTTP symbols one by one
+rather than matching `buraaq_http_`.
+
+The feature runtimes have no dependencies on each other, which is what makes
+dropping one safe. Adding a cross-reference between two of them would break that
+and the map would need to grow edges.
+
+Before this, every binary compiled all eleven files. A `println` program spent
+about 1.7s of its build compiling a UI toolkit, an HTTP server and a thread pool
+it never called, and carried them in the output.
+
 ---
 
 ## 14. Security Considerations
@@ -311,26 +329,13 @@ Dead code elimination strips unused runtime modules.
 ## 15. Repository Layout (Compiler)
 
 ```
-compiler/
-  lexer/
-  parser/
-  ast/
-  resolve/
-  hir/
-  typeck/
-  mir/
-  gfa/
-  codegen/llvm/
-  driver/
-  lsp/
-  fmt/
-tools/
-  buraaq/          # CLI entry
-stdlib/            # buraaq-std sources
-tests/
-  ui/
-  codegen/
-  run/
+compiler-buraaq/
+  src/             # lexer, parser, names, mir, llvm, main
+  boot/stage0.ll   # clone seed
+  golden/
+  selftest/
+stdlib/            # buraaq-std sources + C runtime
+scripts/           # selfhost-test, selfhost-verify, pack-dist
 ```
 
 This architecture supports the roadmap milestones from bootstrap through v1.0 GA without redesigning core phases.

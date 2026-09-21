@@ -1,3 +1,0 @@
-fn sneak(p: ptr[int]) {
-    x = *p
-}

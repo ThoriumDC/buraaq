@@ -5,7 +5,7 @@
 #   sysroot/runtime/...
 #   sysroot/buraaq.pkg
 #
-# Usage (packager machine with release CLI already built, or Cargo available):
+# Usage (packager machine with clang; pack-dist rebuilds the guest):
 #   .\scripts\pack-winget.ps1
 #   .\scripts\pack-winget.ps1 -Version 1.0.1
 param(
@@ -16,8 +16,8 @@ $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 
 if (-not $Version) {
-    $ws = Get-Content (Join-Path $Root "compiler\Cargo.toml") -Raw
-    if ($ws -match '(?m)^version\s*=\s*"([^"]+)"') { $Version = $Matches[1] } else { $Version = "1.0.0" }
+    $main = Get-Content (Join-Path $Root "compiler-buraaq\src\main.bq") -Raw
+    if ($main -match 'buraaq ([0-9]+\.[0-9]+\.[0-9]+)') { $Version = $Matches[1] } else { $Version = "1.0.0" }
 }
 
 # Ensure dist\buraaq.exe
@@ -44,8 +44,6 @@ foreach ($part in @("src", "runtime")) {
 }
 $pkgFile = Join-Path $Stdlib "buraaq.pkg"
 if (Test-Path $pkgFile) { Copy-Item -Force $pkgFile (Join-Path $sys "buraaq.pkg") }
-$rt = Join-Path $Root "compiler\runtime\buraaq_rt.c"
-if (Test-Path $rt) { Copy-Item -Force $rt (Join-Path $sys "runtime\buraaq_rt.c") }
 
 $Zip = Join-Path $Root "dist\$Name.zip"
 if (Test-Path $Zip) { Remove-Item -Force $Zip }

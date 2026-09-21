@@ -7,8 +7,8 @@ Buraaq 1.0 is the language you install and ship. What remains is hardening and e
 | Item | Why |
 |------|-----|
 | Gate D 7-day fuzz | Wall-clock evidence; scripts already refuse to lie |
-| Gate J on GitHub | Prove the existing workflow green |
-| Guest rebuild of `llvm.bq` | Full rustc-off of `compiler-buraaq` |
+| Guest generics / trait dispatch | Product compiler does not yet lower these |
+| Guest Ship / LSP / fmt | Old host CLI had these; they are not subcommands of `dist/buraaq` yet |
 
 ## Next
 

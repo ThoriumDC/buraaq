@@ -262,6 +262,6 @@ Safe Buraaq programs (no `unsafe`, no FFI unsafety) guarantee:
 4. No data races
 5. Deterministic drop order
 
-Proof strategy: GFA + MIR semantics formalized in `compiler/gfa/spec/` (future artifact).
+Proof strategy: GFA + MIR semantics formalized as a future artifact.
 
 This memory model aligns with [LANGUAGE_PHILOSOPHY.md](./LANGUAGE_PHILOSOPHY.md): complexity inside the compiler, not in source code.

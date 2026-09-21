@@ -40,8 +40,13 @@ function Compile-Buraaq($name) {
     if (-not (Test-Path $src)) { return }
     $buraaq = (Get-Command buraaq -ErrorAction SilentlyContinue).Source
     if (-not $buraaq) {
-        $local = Join-Path $Root "..\compiler\target\release\buraaq.exe"
-        if (Test-Path $local) { $buraaq = $local } else { Add-Line "SKIP buraaq/$name — buraaq not on PATH"; return }
+        foreach ($c in @(
+            (Join-Path $Root "..\dist\buraaq.exe"),
+            (Join-Path $Root "..\compiler-buraaq\target\debug\buraaq-compiler.exe")
+        )) {
+            if (Test-Path $c) { $buraaq = $c; break }
+        }
+        if (-not $buraaq) { Add-Line "SKIP buraaq/$name — buraaq not on PATH"; return }
     }
     $flags = if ($ReleaseFast) { @("--release-fast") } elseif ($Release) { @("--release") } else { @() }
     $exe = Join-Path $Out "$name-bq.exe"

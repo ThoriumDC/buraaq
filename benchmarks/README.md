@@ -29,3 +29,5 @@ Languages: `cpp/`, `rust/`, `go/`, `zig/`, `buraaq/`
 Results: `results/suite/report-*.txt`
 
 **Policy:** unfavorable Buraaq numbers are published — see [docs/STATUS.md](../docs/STATUS.md) and [docs/PERFORMANCE.md](../docs/PERFORMANCE.md). Gate B: `integer_sum` **0.00×** (Orbit fold, same n=1e8), `nested_loop` 0.16×. Worst case **1.02×** (`fib_iter`).
+
+Scripts use `dist/buraaq` (self-hosted). Pack first with `scripts/pack-dist.ps1` if that binary is missing.

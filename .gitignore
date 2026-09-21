@@ -40,6 +40,12 @@ id_ed25519
 benchmarks/results/
 compiler-buraaq/target/
 examples/**/target/
+*.ll
+!compiler-buraaq/boot/stage0.ll
+*.s
+*.exe.tmp*
+dist/*.prev
+dist/*.prev2
 
 # Tooling
 .llvm/

@@ -25,13 +25,17 @@ data = parse(response.body)
 
 ### `std.io`
 
-Console output.
+Console I/O.
 
 | API | Description |
 |-----|-------------|
 | `print(msg: text)` | Write text without newline |
 | `println(msg: text)` | Write text with newline |
+| `eprintln(msg: text)` | Write a line to stderr |
 | `print_int(n: int)` | Print integer |
+| `print_float(n: float)` | Print float |
+| `print_bool(v: bool)` | Print bool |
+| `read_line() -> text` | One line from stdin (EOF is `:quit`) |
 
 ### `std.fs`
 
@@ -57,7 +61,12 @@ Types: `File`, `Path`
 | `eq(a, b) -> bool` | Byte equality |
 | `byte(s, i) -> int` | Byte at index, or `-1` |
 | `slice(s, start, end) -> text` | Substring `[start, end)` |
+| `char_of(b: int) -> text` | One-character text from a byte value |
 | `String` | Owned string wrapper with `.len()` |
+
+`char_of` reaches characters a literal cannot: `{` and `}` delimit a string
+interpolation and `"` ends the string, so `char_of(123)`, `char_of(125)` and
+`char_of(34)` are the way to produce them.
 
 ### `std.math`
 
@@ -278,12 +287,70 @@ Call other APIs. Servers belong in `std.keel`.
 | `stringify(v) -> text` | Serialize |
 | `Value.field(key) -> text` | Extract string field (v1) |
 
+### `std.collections`
+
+| API | Description |
+|-----|-------------|
+| `vec_new() -> text` | New empty vector |
+| `vec_len(v) -> int` | Number of elements |
+| `vec_push_int(v, x)` / `vec_push_text(v, s)` | Append |
+| `vec_get_int(v, i) -> int` / `vec_get_text(v, i) -> text` | Read; out of range gives `0` / `""` |
+| `vec_set_int(v, i, x)` / `vec_set_text(v, i, s)` | Overwrite in place |
+| `vec_free(v)` | Release |
+
+A slot holds either an int or a text and the vector does not record which, so
+reading an int slot with `vec_get_text` misinterprets it. Push and read the same
+kind. The handle is typed `text` because that is the only pointer-shaped type the
+bootstrap compiler can express.
+
+| API | Description |
+|-----|-------------|
+| `set_new() -> text` | New empty set of text keys |
+| `set_add(s, key) -> int` | `1` if the key was added, `0` if already present |
+| `set_has(s, key) -> int` | `1` when present |
+| `set_add_csv(s, csv)` | Add every comma-separated entry, ignoring empty ones |
+| `set_len(s) -> int` | Number of keys |
+| `set_free(s)` | Release |
+
+Membership does not depend on how many keys the set holds, so accumulating names
+costs the same per name throughout. `set_add` reporting whether the key is new
+lets a caller both record and act in one step, which is how the bootstrap
+compiler declares each local exactly once.
+
 ### `std.process`
 
 | API | Description |
 |-----|-------------|
 | `cmd(program) -> Command` | Build command |
 | `Command.run() -> int` | Run and return exit code |
+| `argv_new() -> int` | Open an argument vector; returns a handle, or `-1` |
+| `argv_push(handle, arg) -> int` | Append an argument; the first is the program |
+| `argv_run(handle) -> int` | Run to completion; exit code, or `-1` if it could not start |
+| `argv_free(handle)` | Release the handle |
+
+`Command` takes a program path and no arguments, so it rejects anything that
+looks like shell syntax. The `argv_*` family passes an argument vector straight
+to `CreateProcess`/`execvp` with no shell in between, so spaces, quotes and
+metacharacters are literal and need no escaping:
+
+```buraaq
+use std.process.argv_free
+use std.process.argv_new
+use std.process.argv_push
+use std.process.argv_run
+
+fn main() {
+    a = argv_new()
+    argv_push(a, "clang")
+    argv_push(a, "-o")
+    argv_push(a, "out.exe")
+    argv_push(a, "in.ll")
+    code = argv_run(a)
+    argv_free(a)
+}
+```
+
+This is what the bootstrap compiler uses to invoke clang (M8).
 
 ### `std.thread`
 
@@ -368,6 +435,7 @@ Native implementations linked automatically by `buraaq build`. No garbage collec
 | `buraaq_crypto_sha256_hex` | crypto |
 | `buraaq_mutex_*` | sync |
 | `buraaq_process_exit_code` | process |
+| `buraaq_argv_new/push/free`, `buraaq_process_run` | process (argv, no shell) |
 
 ## FFI example
 
@@ -389,15 +457,13 @@ Safe wrappers live in std modules; raw `extern c` calls stay in `unsafe` blocks.
 
 - **Heap**: `text` concat, file read, JSON field extract — one allocation per call
 - **Stack**: primitives, struct literals, mutex handles (v1 stub)
-- **Benchmark**: `cargo bench` in `stdlib/` measures concat allocation rate
+- **Benchmark**: Gate B benches in `benchmarks/` measure concat and numeric work
 
 ## Testing
 
-```bash
-cd stdlib
-cargo test     # 19 module parse tests + C runtime assertions
-cargo bench    # alloc benchmark
-```
+The C runtime unit tests link every translation unit in `runtime/` —
+`buraaq_std.c` calls into grid, hold, stream, and server. See
+[stdlib/README.md](../stdlib/README.md#tests--benchmarks) for the exact command.
 
 Examples live in `stdlib/examples/` — one per major module group.
 

@@ -15,19 +15,16 @@ Ownership: move by default, `ref` / `ref mut`, GFA (E0302 / E0312).
 
 | Command | Contract |
 |---------|----------|
-| `buraaq new NAME` | Keel API scaffold (`page` / `api` / `run`) |
-| `buraaq new NAME --ui` | Lumen native window scaffold |
-| `buraaq up` | Pack + local Dock + ship |
-| `buraaq land [user@HOST]` | Write (and optionally SSH) Dock install for any cloud |
-| `buraaq build [--release]` | Native executable via LLVM + clang |
-| `buraaq run [--release] [-- args…]` | Build and execute |
-| `buraaq test` | Run `test "…" { expect … }` blocks |
-| `buraaq check` | Analyze without linking |
-| `buraaq pack` | Release-build → `target/ship/<app>.bur` |
-| `buraaq launch FILE.bur` | Verify hash and run a ship |
-| `buraaq dock` | Host agent — receive ships on `:7422` |
-| `buraaq ship [HOST]` | Pack + launch locally, or push to a dock |
-| `buraaq --sysroot` | Print stdlib root |
+| `buraaq new NAME --cli` | Hello CLI scaffold |
+| `buraaq run [FILE.bq]` | Build and execute |
+| `buraaq build [FILE.bq [OUT]]` | Native executable via LLVM + clang |
+| `buraaq test [FILE.bq]` | Run `selftest/main.bq` or a file |
+| `buraaq doctor` | Clang, runtime, scripting line |
+| `buraaq` / `repl` / `shell` | Interactive shell (clang per line) |
+| `buraaq -e SNIPPET` | Compile and run a one-liner |
+| `buraaq script FILE.bq` | Compile and run a `.bq` file |
+| `buraaq --version` | `buraaq 1.0.0 (self-hosted)` |
+| `buraaq -C DIR <cmd>` | Run the command with that project directory |
 
 Install: `install.ps1` / `install.sh`.
 
@@ -35,7 +32,7 @@ Install: `install.ps1` / `install.sh`.
 
 | Module | Functions |
 |--------|-----------|
-| `std.io` | `print`, `println` (auto type), `print_int`, `print_float`, `print_bool` |
+| `std.io` | `print`, `println`, `eprintln`, `print_int`, `print_float`, `print_bool`, `read_line` |
 | `std.fs` | `read`, `write`, `exists` |
 | `std.text` | `len`, `concat`, `eq`, `byte`, `slice` |
 | `std.math` | `abs_int`, `sqrt`, `min`, `max`, `sin`/`cos`/`tan`, `exp`/`log`/`pow`, `pi`, `clamp`, `lerp` |

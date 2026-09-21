@@ -1,43 +1,427 @@
-# Bootstrap compiler entry — M3 lexer through M8 guest clang
+# Self-hosted Buraaq compiler.
 use lexer.lex_file
+use llvm.build_auto
 use llvm.build_file
+use llvm.build_project
+use llvm.cmd_new_cli
 use llvm.dump_llvm
+use llvm.find_clang
+use llvm.find_rt
+use llvm.find_std
+use llvm.run_auto
+use llvm.run_project
 use mir.dump_mir
 use names.dump_names
 use parser.parse_file
+use std.fs.exists
+use std.fs.read
+use std.fs.write
+use std.io.eprintln
+use std.io.print
+use std.io.println
 use std.os.arg
 use std.os.args
+use std.os.exit
+use std.os.getenv
+use std.text.byte
+use std.text.char_of
+use std.text.concat
 use std.text.eq
+use std.text.len
+use std.text.slice
+
+fn usage() {
+    eprintln("buraaq 1.0.0 - self-hosted compiler")
+    eprintln("  buraaq                 interactive shell")
+    eprintln("  buraaq -e SNIPPET")
+    eprintln("  buraaq script FILE.bq")
+    eprintln("  buraaq new NAME [--cli]")
+    eprintln("  buraaq run [FILE.bq]")
+    eprintln("  buraaq build [FILE.bq [OUT]]")
+    eprintln("  buraaq test [FILE.bq]")
+    eprintln("  buraaq doctor")
+    eprintln("  buraaq --version")
+    eprintln("  buraaq -C DIR <cmd>")
+}
+
+fn default_out(src: text) -> text {
+    n = len(src)
+    if n > 3 {
+        return concat(slice(src, 0, n - 3), ".exe")
+    }
+    concat(src, ".exe")
+}
+
+fn ends_bq(s: text) -> int {
+    n = len(s)
+    if n < 3 {
+        return 0
+    }
+    if eq(slice(s, n - 3, n), ".bq") {
+        return 1
+    }
+    0
+}
+
+fn flag_c(n: int) -> text {
+    i = 1
+    while i < n {
+        if eq(arg(i), "-C") {
+            if i + 1 < n {
+                return arg(i + 1)
+            }
+        }
+        i = i + 1
+    }
+    ""
+}
+
+fn first_cmd(n: int) -> text {
+    i = 1
+    while i < n {
+        a = arg(i)
+        if eq(a, "-C") {
+            i = i + 2
+        } else {
+            return a
+        }
+    }
+    ""
+}
+
+fn operand_at(n: int, cmd: text, k: int) -> text {
+    i = 1
+    seen = 0
+    got = 0
+    while i < n {
+        a = arg(i)
+        if eq(a, "-C") {
+            i = i + 2
+        } else {
+            if seen == 0 {
+                if eq(a, cmd) {
+                    seen = 1
+                }
+                i = i + 1
+            } else {
+                if got == k {
+                    return a
+                }
+                got = got + 1
+                i = i + 1
+            }
+        }
+    }
+    ""
+}
+
+fn operand_n(n: int, cmd: text) -> int {
+    i = 1
+    seen = 0
+    c = 0
+    while i < n {
+        a = arg(i)
+        if eq(a, "-C") {
+            i = i + 2
+        } else {
+            if seen == 0 {
+                if eq(a, cmd) {
+                    seen = 1
+                }
+                i = i + 1
+            } else {
+                c = c + 1
+                i = i + 1
+            }
+        }
+    }
+    c
+}
+
+fn flag_e(n: int) -> text {
+    i = 1
+    while i < n {
+        if eq(arg(i), "-e") {
+            if i + 1 < n {
+                return arg(i + 1)
+            }
+        }
+        i = i + 1
+    }
+    ""
+}
+
+fn text_has(s: text, needle: text) -> int {
+    n = len(s)
+    m = len(needle)
+    if m == 0 {
+        return 1
+    }
+    if n < m {
+        return 0
+    }
+    i = 0
+    while i + m <= n {
+        if eq(slice(s, i, i + m), needle) {
+            return 1
+        }
+        i = i + 1
+    }
+    0
+}
+
+fn eval_path() -> text {
+    tmp = getenv("TEMP")
+    if len(tmp) == 0 {
+        tmp = getenv("TMP")
+        done = 1
+    }
+    if len(tmp) == 0 {
+        tmp = "/tmp"
+        done = 1
+    }
+    concat(tmp, "/bq_eval.bq")
+}
+
+fn snippet_is_stmt(src: text) -> int {
+    if text_has(src, "fn main") == 1 {
+        return 1
+    }
+    i = 0
+    n = len(src)
+    while i < n {
+        c = byte(src, i)
+        if c == 32 {
+            i = i + 1
+        } elif c == 9 {
+            i = i + 1
+        } else {
+            break
+        }
+    }
+    if i >= n {
+        return 1
+    }
+    c = byte(src, i)
+    if c >= 48 {
+        if c <= 57 {
+            return 0
+        }
+    }
+    if c == 45 {
+        return 0
+    }
+    if c == 40 {
+        return 0
+    }
+    1
+}
+
+fn snippet_src(src: text) -> text {
+    if text_has(src, "fn main") == 1 {
+        return src
+    }
+    nl = char_of(10)
+    out = concat("use std.io.print", nl)
+    out = concat(out, "use std.io.println")
+    out = concat(out, nl)
+    out = concat(out, "use std.io.print_int")
+    out = concat(out, nl)
+    out = concat(out, "fn main() ")
+    out = concat(out, char_of(123))
+    out = concat(out, nl)
+    if snippet_is_stmt(src) == 1 {
+        out = concat(out, src)
+        out = concat(out, nl)
+        out = concat(out, char_of(125))
+        out = concat(out, nl)
+        return out
+    }
+    out = concat(out, "print_int(")
+    out = concat(out, src)
+    out = concat(out, ")")
+    out = concat(out, nl)
+    out = concat(out, char_of(125))
+    concat(out, nl)
+}
+
+fn run_eval(src: text) -> int {
+    path = eval_path()
+    write(path, snippet_src(src))
+    run_auto(path)
+}
+
+fn do_eval(n: int) {
+    src = flag_e(n)
+    if len(src) == 0 {
+        eprintln("buraaq: -e needs a snippet")
+        exit(1)
+    }
+    exit(run_eval(src))
+}
+
+fn do_script(n: int) {
+    e = flag_e(n)
+    if len(e) > 0 {
+        exit(run_eval(e))
+    }
+    file = operand_at(n, "script", 0)
+    if len(file) == 0 {
+        eprintln("buraaq: script FILE.bq")
+        exit(1)
+    }
+    exit(run_auto(file))
+}
+
+fn do_repl() {
+    println("buraaq 1.0.0 shell")
+    println("each line is compiled with clang; :quit to leave")
+    go = 1
+    while go == 1 {
+        print("bq> ")
+        line = read("-")
+        if eq(line, ":quit") {
+            go = 0
+        } elif eq(line, ":exit") {
+            go = 0
+        } elif eq(line, "quit") {
+            go = 0
+        } elif eq(line, ":help") {
+            println(":quit  leave the shell")
+        } elif len(line) == 0 {
+            done = 1
+        } else {
+            run_eval(line)
+            done = 1
+        }
+    }
+}
+
+fn doctor() {
+    println("buraaq 1.0.0 (self-hosted)")
+    println(concat("clang: ", find_clang()))
+    println(concat("runtime: ", find_rt()))
+    st = find_std()
+    if len(st) > 0 {
+        println(concat("stdlib-runtime: ", st))
+        done = 1
+    }
+    println("scripting: clang (REPL / -e / script compile a temp .bq)")
+    println("bootstrap: this binary compiles Buraaq")
+}
+
+fn do_new(n: int, root: text) {
+    name = operand_at(n, "new", 0)
+    if eq(name, "--cli") {
+        name = operand_at(n, "new", 1)
+        done = 1
+    }
+    code = cmd_new_cli(root, name)
+    exit(code)
+}
+
+fn do_run(n: int, root: text) {
+    file = operand_at(n, "run", 0)
+    if len(file) > 0 {
+        code = run_auto(file)
+        exit(code)
+    }
+    code = run_project(root)
+    exit(code)
+}
+
+fn do_build(n: int, root: text) {
+    c = operand_n(n, "build")
+    if c > 3 {
+        build_file(operand_at(n, "build", 0), operand_at(n, "build", 1), operand_at(n, "build", 2), operand_at(n, "build", 3))
+    } elif c > 1 {
+        code = build_auto(operand_at(n, "build", 0), operand_at(n, "build", 1))
+        exit(code)
+    } elif c > 0 {
+        src = operand_at(n, "build", 0)
+        code = build_auto(src, default_out(src))
+        exit(code)
+    } else {
+        code = build_project(root)
+        exit(code)
+    }
+}
+
+fn do_test(n: int, root: text) {
+    file = operand_at(n, "test", 0)
+    if len(file) > 0 {
+        exit(run_auto(file))
+    }
+    cand = "selftest/main.bq"
+    if len(root) > 0 {
+        cand = concat(root, "/selftest/main.bq")
+    }
+    if exists(cand) {
+        exit(run_auto(cand))
+    }
+    cand2 = "tests/main.bq"
+    if len(root) > 0 {
+        cand2 = concat(root, "/tests/main.bq")
+    }
+    if exists(cand2) {
+        exit(run_auto(cand2))
+    }
+    eprintln("buraaq-boot: no selftest/main.bq - pass a .bq file")
+    exit(1)
+}
 
 fn main() {
     n = args()
-    if n > 5 {
-        if eq(arg(1), "build") {
-            build_file(arg(2), arg(3), arg(4), arg(5))
-        } elif eq(arg(1), "parse") {
-            parse_file(arg(2))
-        } elif eq(arg(1), "names") {
-            dump_names(arg(2))
-        } elif eq(arg(1), "mir") {
-            dump_mir(arg(2))
-        } elif eq(arg(1), "llvm") {
-            dump_llvm(arg(2))
+    root = flag_c(n)
+    if n < 2 {
+        do_repl()
+    } else {
+        cmd = first_cmd(n)
+        if eq(cmd, "--version") {
+            println("buraaq 1.0.0 (self-hosted)")
+        } elif eq(cmd, "-V") {
+            println("buraaq 1.0.0 (self-hosted)")
+        } elif eq(cmd, "version") {
+            println("buraaq 1.0.0 (self-hosted)")
+        } elif eq(cmd, "--help") {
+            usage()
+        } elif eq(cmd, "-h") {
+            usage()
+        } elif eq(cmd, "help") {
+            usage()
+        } elif eq(cmd, "doctor") {
+            doctor()
+        } elif eq(cmd, "new") {
+            do_new(n, root)
+        } elif eq(cmd, "run") {
+            do_run(n, root)
+        } elif eq(cmd, "build") {
+            do_build(n, root)
+        } elif eq(cmd, "test") {
+            do_test(n, root)
+        } elif eq(cmd, "script") {
+            do_script(n)
+        } elif eq(cmd, "repl") {
+            do_repl()
+        } elif eq(cmd, "shell") {
+            do_repl()
+        } elif eq(cmd, "-e") {
+            do_eval(n)
+        } elif eq(cmd, "check") {
+            do_build(n, root)
+        } elif eq(cmd, "parse") {
+            parse_file(operand_at(n, "parse", 0))
+        } elif eq(cmd, "names") {
+            dump_names(operand_at(n, "names", 0))
+        } elif eq(cmd, "mir") {
+            dump_mir(operand_at(n, "mir", 0))
+        } elif eq(cmd, "llvm") {
+            dump_llvm(operand_at(n, "llvm", 0))
+        } elif ends_bq(cmd) == 1 {
+            lex_file(cmd)
         } else {
-            lex_file(arg(1))
+            usage()
+            exit(1)
         }
-    } elif n > 2 {
-        if eq(arg(1), "parse") {
-            parse_file(arg(2))
-        } elif eq(arg(1), "names") {
-            dump_names(arg(2))
-        } elif eq(arg(1), "mir") {
-            dump_mir(arg(2))
-        } elif eq(arg(1), "llvm") {
-            dump_llvm(arg(2))
-        } else {
-            lex_file(arg(1))
-        }
-    } elif n > 1 {
-        lex_file(arg(1))
     }
 }

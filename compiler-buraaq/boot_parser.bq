@@ -1,0 +1,10 @@
+# Entry point for the M9 parser stage: dump AST events for one file.
+#
+# Outside `src/` for the same reason as `boot_llvm.bq`, and reached through `use`
+# so `parser.bq` is free to import the shared scanner from `scan.bq`.
+use parser.parse_file
+use std.os.arg
+
+fn main() {
+    parse_file(arg(1))
+}

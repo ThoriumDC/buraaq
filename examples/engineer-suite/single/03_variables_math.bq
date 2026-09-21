@@ -5,5 +5,5 @@ fn main() {
     width = 10
     height = 4
     area = width * height
-    println(area.to_text())
+    println(area)
 }

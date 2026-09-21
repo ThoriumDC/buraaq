@@ -33,7 +33,7 @@ foreach ($line in $rows) {
                 Write-Host "PASS run" -ForegroundColor Green
                 $pass++
             } elseif ($mode -eq "script") {
-                $localBq = Join-Path $Root "..\..\compiler\target\release\buraaq.exe"
+                $localBq = Join-Path $Root "..\..\dist\buraaq.exe"
                 $bq = if (Test-Path $localBq) { $localBq } else { "buraaq" }
                 $out = & $bq script $path 2>&1 | Out-String
                 if ($LASTEXITCODE -ne 0) { throw "script failed: $out" }

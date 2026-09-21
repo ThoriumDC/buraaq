@@ -62,9 +62,10 @@ Hello, `\n` escapes, variables, `mut`, `if`/`elif`/`else`, `while`, `for` ranges
 
 ## Still unfinished
 
-- `async` / `await`, `parallel for`, channels
+- `async` / `await`, `parallel for`, channels (guest inlines `spawn` and strips `async`/`await`; host still has the runtime)
 - Full `Result`/`Option` payload match (happy-path `if` works)
-- Package registry, 7-day fuzz, full self-host
+- Package registry, 7-day fuzz
+- Guest lowering of generics (tests use the monomorphized int path)
 
 ## Known patterns
 
@@ -81,4 +82,4 @@ Hello, `\n` escapes, variables, `mut`, `if`/`elif`/`else`, `while`, `for` ranges
 
 ## CI
 
-`cargo test -p buraaq_driver engineer_suite` runs the required subset from Rust (same manifest).
+`.\run.ps1` is the product proof for this suite (same manifest).

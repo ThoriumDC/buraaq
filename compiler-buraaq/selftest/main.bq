@@ -1,0 +1,58 @@
+# rustc-free proof of the product compiler. Expected stdout: 413489
+type Count = int
+import std.io
+
+trait Shape {
+    fn area()
+}
+
+impl Count {
+    fn unused_zero() -> int {
+        0
+    }
+}
+
+const LIMIT = 4
+static STEP = 1
+
+fn id(a: int) where {
+}
+
+fn jumps(n: int) -> int {
+    seen = 0
+    while seen < n {
+        seen = seen + STEP
+        if seen > 3 {
+            break
+        }
+        continue
+        seen = seen + 100
+    }
+    return seen
+}
+
+async fn ready(n: int) -> int {
+    n
+}
+
+fn main() {
+    print(LIMIT)
+    mut n = 0
+    while n < 5 {
+        n = n + 1
+        if n == 2 {
+            continue
+        }
+        if n == 4 {
+            break
+        }
+        print(n)
+    }
+    print(await jumps(9))
+    spawn {
+        n = n
+    }
+    spawn ready(0)
+    defer print(9)
+    print(8)
+}

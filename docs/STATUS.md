@@ -16,7 +16,8 @@ Do not print `BURAAQ 1.0 RELEASE GATES: PASS` until A–J all pass, including a 
 - Keel TLS APIs + Postgres (including Neon `sslmode=require`)
 - Ship `.bur` / Dock `:7422` / Land kits (`aws`, `azure`, `gcp`, `hetzner`, `bare`)
 - Compiler frontend in Buraaq: lexer, parser, names, MIR, LLVM text (M3–M10)
-- Install copies packaged `dist/buraaq` + clang sidecar — **Rust is not required to use Buraaq**
+- Install copies packaged `dist/buraaq` + clang sidecar
+- Self-hosted CLI: shell / `-e` / `script` / `run` / `build` / `test` / `doctor`
 - Forge (private `buraaq-play/forge`): ownership, spawn, generics, Keel ledger, pack, Hetzner land — not in this public tree
 - Compiler stress/fuzz smoke: 600 mutated programs, 400 random-byte, 10 clang compile+run
 
@@ -26,14 +27,14 @@ Do not print `BURAAQ 1.0 RELEASE GATES: PASS` until A–J all pass, including a 
 |------|--------|----------|
 | A Multi-module native | **PASS** | 10-module exe prints `42`; Forge is 4 modules |
 | B Perf vs C++ `-O2` | **PASS** | Orbit fold closes `integer_sum` (**0.00×**, same n); worst `fib_iter` **1.02×** |
-| C–C‴ Bootstrap M3–M11 | **PASS** | Guest LLVM compiles lexer, parser, and `llvm.bq`; goldens still pass |
+| C–C‴ Bootstrap M3–M25 | **PASS** | CI `selfhost`; `boot/stage0.ll` + clang; mut/float/typed print |
 | D 7-day fuzz | **deferred** | Public 1.0 shipped; wall-clock fuzz continues after launch |
 | E Safety | **PASS** | GFA + typed drop + loop `defer` on break/continue |
 | F Wrong-code | **PASS** | UI corpus + inverted spans no longer panic |
 | G Stdlib 1.0 APIs | **PASS** | fs/math/sha256/json numbers/HTTPS GET; Keel+Neon |
 | H Install | **PASS** | `install.ps1` / `install.sh` + Land kit |
 | I Docs | **PASS** | This tree + [buraaq.dev](https://buraaq.dev) |
-| J Tier-1 CI | **smoke** | GitHub Actions: `cargo test --workspace --lib` + CLI build |
+| J Tier-1 CI | **PASS** | Only `selfhost`: clang + stage0 + verify |
 
 ## Benchmarks (Gate B)
 
@@ -51,17 +52,17 @@ Orbit rewrites wrapping `sum = sum * 3 + i` to affine matrix doubling (O(log n) 
 
 ## Self-host (honest)
 
-The language is self-hosted for **users**: one-step `install.ps1` / `install.sh` copies `dist/buraaq`; LLVM is the backend; Rust is not on the user path.
-
-The **compiler frontend** (lexer, parser, names, MIR, LLVM emission) is written in Buraaq. Guest LLVM compiles `lexer.bq`, `parser.bq`, and `llvm.bq` (M11). rustc still builds the host CLI that performs that guest compile. That is not a fake rustc-off. Details: [BOOTSTRAP.md](BOOTSTRAP.md).
+The **compiler** is written in Buraaq. A clone with clang links `compiler-buraaq/boot/stage0.ll` and rebuilds, packs, tests, and CI-proves it. The C runtime lives in `stdlib/runtime/`. Proof: [BOOTSTRAP.md](BOOTSTRAP.md#prove-the-chain).
 
 ## Still hardening
 
 - Gate D 7-day fuzz elapsed time (deferred from the public 1.0.0 tag)
-- Full integration CI (modules, bootstrap, Gate B, fuzz smoke) beyond `--lib`
-- Guest-built compiler rebuilding `compiler-buraaq` (full rustc-off)
 - Package registry, DAP pretty-printers, channels
 - POSIX HTTPS needs OpenSSL at link; JSON is field extract, not a full DOM
+- Guest lowering of generics, trait-method dispatch, and real concurrent spawn
+- Guest float arithmetic beyond literals (literals and typed print are M25)
+- Language-tour compile is 60/60; mutex/channel/await/raw-pointer still use sequential/stub lowering (spawn is inlined)
+- Interactive `buraaq` / `-e` / `script` compile a temp `.bq` with clang (`read("-")` is one stdin line)
 
 ## Known grain
 

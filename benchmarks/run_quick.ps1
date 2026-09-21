@@ -15,9 +15,15 @@ $Opt = if ($ReleaseFast) { "-O3" } elseif ($Release) { "-O2" } else { "-O0" }
 $Lto = if ($ReleaseFast) { @("-flto=thin") } else { @() }
 $Benches = $Bench.Split(",") | ForEach-Object { $_.Trim() } | Where-Object { $_ }
 
-$BuraaqCandidate = (Join-Path $Root "..\compiler\target\release\buraaq.exe")
-if (-not (Test-Path -LiteralPath $BuraaqCandidate)) {
-    Write-Error "Buraaq compiler not found at $BuraaqCandidate. Run: cd compiler; cargo build --release"
+$BuraaqCandidate = $null
+foreach ($c in @(
+    (Join-Path $Root "..\dist\buraaq.exe"),
+    (Join-Path $Root "..\compiler-buraaq\target\debug\buraaq-compiler.exe")
+)) {
+    if (Test-Path -LiteralPath $c) { $BuraaqCandidate = $c; break }
+}
+if (-not $BuraaqCandidate) {
+    Write-Error "Buraaq compiler not found. Run scripts/pack-dist.ps1 first."
 }
 $Buraaq = (Get-Item -LiteralPath $BuraaqCandidate).FullName
 $Clang = (Get-Command clang -ErrorAction SilentlyContinue).Source

@@ -1,0 +1,28 @@
+# Every token kind the host lexer can produce, for M18a parity.
+# Not a valid program — only the kinds are compared.
+#
+# Two of the host's kinds are absent and cannot be added: `Eof`, which the test
+# drops from both streams, and `Hash`, which no source can produce because `#`
+# is always consumed as a line comment before a token is cut.
+"""
+A block comment is trivia, not a string.
+"""
+async await break const continue copy defer drop else elif enum err extern
+false fn for give if impl in match module mut new none not ok parallel pub
+raise ref return self some spawn struct throws trait true type unsafe use
+void while as test bench expect
+
+plain_ident _under x9
+
+0 42 1_000 0xFF 0XfF 0b1010 0B11
+3.14 1e9 2E-7 6.02e+23 1_0.5_0
+
+"text" "with {interp} inside" "nested {f("q")} quote" "esc \" and \n"
+'a' '\n' '\\' '\x41'
+b"bytes" b"esc \x00"
+
++ - * / % = == != < <= > >= && || ! ? ?? & | ^ ~ << >>
+. .. ..= ... -> => , : ; ( ) [ ] { } @
+0..3
+
+$ `

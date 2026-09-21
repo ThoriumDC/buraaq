@@ -40,16 +40,39 @@ Legitimate-use policy; Buraaq administration cooperates with lawful agency reque
 
 ### Added
 
+- Complete self-host chain (M21–M24): product CLI is the guest; `boot/stage0.ll` + clang clones without rustc; CI `selfhost` has no rust-toolchain
+- M25: guest skips `mut`, lowers float literals, and types `print` / `println` / `print_int` / `print_float` / `print_bool` (including `print_stress.bq`)
+- M26: `buraaq_rt.c` lives in `stdlib/runtime/`; pack/install/CI need only clang and the guest
+- `scripts/selfhost-test` / `selfhost-verify` / `pack-dist` seed from a guest binary or `boot/stage0.ll`, never from a rustc-built host
+- Guest lowering: `const` / `static` / `continue` / `defer`; `spawn` inlined; `trait` skipped; `impl` unwrapped; `async`/`await` stripped
 - MIR optimization pipeline: constant folding, DCE, CFG simplification, small-call inlining
 - `--release-fast` (`-O3` + thin LTO) and `--size` (`-Os`)
 - Cross-language benchmark suite
 - Buraaq Ship / Keel / Dock / Land
 - Fuzz tests: lexer, package manifest parser
+- `buraaq` / `repl` / `-e` / `script` compile snippets with clang (stdin line reader in `buraaq_rt.c`)
 
 ### Changed
 
 - Parser missing-expression diagnostic uses **E0102** (E0101 reserved for unknown names)
 - Ownership/borrow errors use multi-span teacher-style diagnostics
+- Stdlib C runtime tests link `buraaq_rt.c` and do not require `OUT_DIR`
+
+### Removed
+
+- Leftover rustc host (`compiler/`) and the rust-only `stdlib` crate (`Cargo.toml`, parse tests, alloc bench). The product path is `compiler-buraaq/` + clang.
+
+### Fixed (self-host hardening)
+
+- `xs[1].to_text()` was skipped as a generic type argument, so array index tests printed a stale int; only `Type[T].new` / `.bounded` / `{` skip the brackets
+- `extern c` `...` varargs never advanced the parser, so `printf(..., ...)` grew IR until the machine ran out of RAM
+- `buraaq -C DIR run` now sets the process directory to `DIR`, so project files like `data.txt` resolve
+- Guest signatures treat `f64`/`f32` as float and `void` as void, so Gate B timers are not i32 subtracts
+
+- `(a + b)` and any parenthesized expression read the operand that started it instead of the computed value, so struct field sums and guard conditions were wrong
+- An unterminated `{` inside a string literal looped the emitter forever; a three byte file (`" {`) was enough. 17 of 200 random-byte inputs used to hang, now 0 of 300
+- A tail `if` in a function body now returns its arm's value, and only when that arm ends in a real value of the function's own type
+- Guest LLVM now lowers `Mutex.new` / `.lock()` / `guard[]`, `Channel[T].bounded` / `.send` / `.recv`, `spawn_task`/`await`, and `*mut` / `&mut x as *mut T` / `.is_null()` so the language tour compiles 60/60
 
 ### Fixed
 

@@ -7,19 +7,21 @@ buraaq ai doctor
 buraaq ai doctor --fix      # managed PEFT/TRL venv
 buraaq ai pull Qwen/Qwen3-8B
 buraaq ai inspect Qwen/Qwen3-8B
+buraaq ai strata Qwen/Qwen3-32B   # GPU/RAM/disk residency plan
 buraaq ai serve Qwen/Qwen3-8B
 buraaq ai chat Qwen/Qwen3-8B
 buraaq ai train --yes
 buraaq land --ai
 ```
 
-Stack name: **Mind**. CLI family: `buraaq ai`. Language: `std.ai`.
+Stack name: **Mind**. Heavy models: **Strata** ([STRATA.md](STRATA.md)). CLI family: `buraaq ai`. Language: `std.ai`.
 
 ## Phase status
 
 | Piece | Phase 1 | Phase 2 |
 |-------|---------|---------|
 | Host doctor / planner / cache | Yes | + train readiness |
+| **Strata** GPU→RAM→NVMe planner | Yes (orchestrates peer engines) | Native pager |
 | Backends vLLM / llama.cpp / OpenAI | Yes | |
 | OpenAI-compatible serve + SSE | Yes | + embeddings proxy, `--timeout` |
 | `std.ai` chat client | Yes | |

@@ -67,12 +67,18 @@ give v = ch.recv()
 
 ## Part VI — Tooling as a feature
 
+The compiler is written in Buraaq. `dist/buraaq` is that compiler.
+
 | Tool | Command |
 |------|---------|
-| Build | `buraaq build --release` |
+| Shell | `buraaq` / `buraaq repl` |
+| One-liner | `buraaq -e "print_int(40+2)"` |
+| File | `buraaq script FILE.bq` / `buraaq run FILE.bq` |
+| Build | `buraaq build` |
 | Test | `buraaq test` |
-| Format | `buraaq fmt` |
-| IDE | `buraaq lsp-server` + VS Code extension |
+| Doctor | `buraaq doctor` |
+
+The shell wraps each line in `fn main` and compiles it with clang (same language as AOT, not a second interpreter). See [SCRIPTING.md](SCRIPTING.md). Editor support: [editors/](../editors/README.md).
 
 ## Part VII — Performance
 
@@ -108,7 +114,7 @@ Pre-1.0: expect evolution. At 1.0: syntax + ownership rules frozen per [STABILIT
 
 ## Part XI — What Buraaq is not
 
-- Not a scripting language with hidden GC
+- Not a scripting language with hidden GC (optional `buraaq` / `-e` / `script` still compile native snippets)
 - Not a Rust clone with different spelling
 - Not "simple" by removing `unsafe` when you need FFI
 

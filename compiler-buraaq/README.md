@@ -1,41 +1,49 @@
-Compiler **written in Buraaq**. Users install Buraaq and never open this folder. Track: [docs/BOOTSTRAP.md](../docs/BOOTSTRAP.md).
+Compiler **written in Buraaq**. This is the product compiler. Users install `dist/buraaq` and never open this folder. Track: [docs/BOOTSTRAP.md](../docs/BOOTSTRAP.md).
 
 | Milestone | Status | Evidence |
 |-----------|--------|----------|
-| **M3** Lexer | **PASS** | `bootstrap_m3` — kinds match Rust on `golden/sample.bq` |
-| **M4** Parser | **PASS** | `bootstrap_m4` — AST events match Rust `Parser` |
-| **M5** Names | **PASS** | `bootstrap_m5_names_match_rust` |
-| **M6** MIR subset | **PASS** | `bootstrap_m6_mir_subset_matches_rust` |
-| **M7** LLVM text | **PASS** | guest `.ll` clang-links; golden prints `5` |
-| **M8** Driver | **PASS** | guest `build` shells clang; golden prints `5` |
-| **M9** Guest lexer/parser | **PASS** | `bootstrap_m9_m10` — guest LLVM compiles `lexer.bq`/`parser.bq`; lexer kinds match M3; parser dump has `fn`/`add` |
-| **M10** Install sidecar | **PASS** | `clang_path` + install prefers `dist/` + ensure-llvm sidecar |
+| **M3–M8** Lexer through guest clang | **PASS** | goldens + `print(add(2,3))` is `5` |
+| **M9** Guest lexer/parser | **PASS** | guest LLVM compiles `lexer.bq`/`parser.bq` |
+| **M10** Install sidecar | **PASS** | clang via PATH / `BURAAQ_CLANG` / sidecar; install copies `dist/` |
+| **M12–M17** Fixpoint, modules, enums, loops, whole guest | **PASS** | stage1 and stage2 emit byte-identical IR |
+| **M18** Full-surface parity | **PASS** | `tokens.bq` / `ast.bq` |
+| **M19** Types from signatures | **PASS** | call `->` types and per-file diagnostics |
+| **M20** rustc-off of this package | **PASS** | guest rebuilds itself with clang |
+| **M21** Product compiler | **PASS** | `buraaq run golden/sample.bq` prints `5`; pack-dist does not invoke cargo |
+| **M22** Product path | **PASS** | `buraaq new hello --cli` then `buraaq run`; `module` / `loop` / `unsafe` |
+| **M23** rustc-free proof | **PASS** | `buraaq test` selftest; `scripts/selfhost-test` |
+| **M24** rustc-free clone | **PASS** | `boot/stage0.ll`; spawn inlined; trait/impl/async skipped |
+| **M25** mut / float / print | **PASS** | `mut` locals; float literals; typed and multi-arg print |
+| **M26** stdlib runtime | **PASS** | runtime in stdlib; CI is `selfhost` |
 
 ## Run
 
+Clone + clang:
+
+```text
+powershell -File scripts/selfhost-test.ps1
+powershell -File scripts/selfhost-verify.ps1
+# or: bash scripts/selfhost-test.sh && bash scripts/selfhost-verify.sh
+```
+
+```text
+buraaq new hello --cli
+cd hello
+buraaq run
+buraaq build
+buraaq doctor
+buraaq test
+buraaq -e "print_int(40+2)"
+```
+
+Dump commands:
+
 ```bash
-# M3 — token kinds
 buraaq run -C compiler-buraaq -- golden/sample.bq
-
-# M4 — parse events
 buraaq run -C compiler-buraaq -- parse golden/sample.bq
-
-# M5 / M6
-buraaq run -C compiler-buraaq -- names golden/sample.bq
-buraaq run -C compiler-buraaq -- mir golden/sample.bq
-
-# M7 — LLVM text on stdout
+buraaq run -C compiler-buraaq -- names golden/ast.bq
+buraaq run -C compiler-buraaq -- mir golden/ast.bq
 buraaq run -C compiler-buraaq -- llvm golden/sample.bq
-
-# M8 — guest clang (paths must have no spaces)
-buraaq run -C compiler-buraaq -- build golden/sample.bq out.exe compiler/runtime/buraaq_rt.c clang
 ```
 
-```bash
-cargo test -p buraaq_driver --test bootstrap_m3
-cargo test -p buraaq_driver --test bootstrap_m4
-cargo test -p buraaq_driver --test bootstrap_m5_m8
-cargo test -p buraaq_driver --test bootstrap_m9_m10
-```
-
-The host CLI still builds this package (including `llvm.bq`). M9 is guest LLVM compiling the lexer and parser. Full guest rebuild of `llvm.bq` is the remaining bootstrap step — [STATUS.md](../docs/STATUS.md).
+Rebuilding, testing, and packing this package is clang plus a guest binary or `boot/stage0.ll`.

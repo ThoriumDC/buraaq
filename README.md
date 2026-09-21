@@ -5,7 +5,7 @@
 
 **Write like Python. Run like C.**
 
-A self-hosted systems language from **Thorium DC**. You write `.bq`. LLVM emits a native binary. There is no garbage collector, and the default path is AOT (no Docker required). Optional `buraaq script` interprets MIR for a fast edit loop — same language, not a second dialect. Unique `std.*` names import themselves. Rust is not required to install.
+A self-hosted systems language from **Thorium DC**. You write `.bq`. LLVM emits a native binary. There is no garbage collector, and the default path is AOT (no Docker required). Optional `buraaq` / `-e` / `script` compile a snippet with clang for a fast edit loop — same language, not a second dialect. Unique `std.*` names import themselves.
 
 ```buraaq
 fn main() {
@@ -28,7 +28,7 @@ Site: [buraaq.dev](https://buraaq.dev)
 
 ## Install (one step)
 
-You need **Buraaq** and **clang**. You do **not** need Rust, Cargo, Node, or a JVM.
+You need **Buraaq** and **clang**. You do **not** need Node, a JVM, or Docker.
 
 ### Windows (recommended)
 
@@ -55,7 +55,9 @@ cd buraaq
 buraaq doctor
 ```
 
-The installer copies packaged `dist/buraaq` and the stdlib sysroot next to it, then sidecars LLVM if clang is missing. Cargo exists only for people who *package* a new `dist/` (`scripts/pack-dist.ps1`).
+The installer copies packaged `dist/buraaq` (the self-hosted compiler) and the stdlib sysroot next to it, then sidecars LLVM if clang is missing. `scripts/pack-dist.ps1` rebuilds that compiler from `boot/stage0.ll` or a previous guest.
+
+To prove a clone: `powershell -File scripts/selfhost-test.ps1` then `powershell -File scripts/selfhost-verify.ps1`.
 
 ---
 
@@ -114,12 +116,13 @@ Secrets stay in host env. Never in git. Test only machines you own or are author
 |--|--|
 | [buraaq.dev](https://buraaq.dev) | Public docs: install → ledger CLI → modules → live API → ship |
 | [Syntax](docs/SYNTAX_REFERENCE.md) | The language |
-| [The stack](docs/STACK.md) | Keel, Stream, Hold, Grid, Ship, Dock, Land, Mind |
+| [Scripting](docs/SCRIPTING.md) | `buraaq` / `-e` / `script` |
+| [The stack](docs/STACK.md) | Keel, Stream, Hold, Grid, Ship, Dock, Land, Mind, Strata |
 | [Buraaq AI](docs/AI.md) | `buraaq ai` serve / chat / planner |
 | [Status](docs/STATUS.md) | What 1.0 measured, what still hardens |
 | [Performance](docs/PERFORMANCE.md) | Gate B vs C++ |
 
-The compiler frontend (lexer, parser, names, MIR, LLVM text) is written in Buraaq. rustc still *builds* the packaged CLI on a packager machine. Users never see it. That is not a fake rustc-off. [docs/BOOTSTRAP.md](docs/BOOTSTRAP.md).
+The compiler is written in Buraaq. `dist/buraaq` is that compiler, rebuilt by itself with clang. A clone links `compiler-buraaq/boot/stage0.ll`. [docs/BOOTSTRAP.md](docs/BOOTSTRAP.md).
 
 ## Layout
 
@@ -131,7 +134,6 @@ The compiler frontend (lexer, parser, names, MIR, LLVM text) is written in Buraa
 | `benchmarks/` | Gate B vs C++ `-O2` |
 | `docs/` | Spec, stack, book |
 | `editors/` | VS Code, Vim, Neovim, Sublime, Helix, Zed, JetBrains |
-| `compiler/` | Host CLI used to *build* this tree |
 | `dist/` | Packaged `buraaq` for `install.ps1` / `install.sh` |
 
 ```text

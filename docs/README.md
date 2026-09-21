@@ -7,9 +7,11 @@ Read in this order. Skip what you do not need.
 1. [Install](../README.md#install) — `install.ps1` / `install.sh`, then `buraaq doctor`
 2. [Syntax](SYNTAX_REFERENCE.md)
 3. [The Book](BURAAQ_BOOK.md)
+3b. [Scripting](SCRIPTING.md) — `buraaq` / `-e` / `script` (clang per snippet)
 4. [Standard library](STDLIB.md) — including **Stream**, **Hold**, **Grid**
-5. [The stack](STACK.md) — Keel, Ship, Dock, Land, Mind
+5. [The stack](STACK.md) — Keel, Ship, Dock, Land, Mind, Strata
 6. [Buraaq AI](AI.md) — `buraaq ai`, planner, OpenAI-compatible serve
+6b. [Strata](STRATA.md) — GPU → RAM → NVMe model residency
 
 ## Ship an API
 
@@ -31,7 +33,7 @@ Read in this order. Skip what you do not need.
 ## Language internals (contributors)
 
 - [Status](STATUS.md) — 1.0 evidence and remaining hardening
-- [Bootstrap](BOOTSTRAP.md) — compiler written in Buraaq
+- [Bootstrap](BOOTSTRAP.md) — product compiler is self-hosted; prove the chain
 - [Compiler architecture](COMPILER_ARCHITECTURE.md)
 - [Internals](INTERNALS.md)
 - [Roadmap](ROADMAP.md)

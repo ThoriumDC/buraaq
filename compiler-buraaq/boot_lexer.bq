@@ -1,0 +1,12 @@
+# Entry point for the M9 lexer stage: dump token kinds for one file.
+#
+# Like `boot_llvm.bq` it lives outside `src/` so the host does not compile it as a
+# second `main` alongside `src/main.bq`. The guest reaches `lexer` through `use`,
+# which is what the tests used to do by pasting the module text in front of a
+# generated `main` — a weave that broke the moment `lexer.bq` imported anything.
+use lexer.lex_file
+use std.os.arg
+
+fn main() {
+    lex_file(arg(1))
+}

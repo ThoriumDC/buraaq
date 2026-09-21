@@ -6,8 +6,7 @@ fn work() {
 }
 
 fn main() {
-    t = spawn {
+    spawn {
         work()
     }
-    t.wait()
 }

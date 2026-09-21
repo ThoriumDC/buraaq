@@ -1,4 +1,10 @@
-# M3 bootstrap lexer — token kinds match Rust `buraaq_lexer`
+# Bootstrap lexer — token kinds match Rust `buraaq_lexer`.
+#
+# Every kind the host can produce is produced here, and `bootstrap_m3` compares
+# the two streams on a golden that exercises all of them. Where the host is
+# lenient this is too: an unterminated string ends at the newline, a malformed
+# number still comes back as Int, and neither is reported here because the kinds
+# are what the parser consumes.
 use std.fs.read
 use std.io.println
 use std.text.byte
@@ -22,42 +28,258 @@ fn is_digit(c: int) -> bool {
     c >= 48 && c <= 57
 }
 
+fn is_hex(c: int) -> bool {
+    is_digit(c) || (c >= 97 && c <= 102) || (c >= 65 && c <= 70)
+}
+
 fn emit_kind(kind: text) {
     println(kind)
 }
 
+# Three quotes in a row open a block comment, which the host discards as trivia
+# rather than lexing as a string.
+fn is_triple(src: text, i: int, n: int) -> bool {
+    if i + 2 >= n {
+        return false
+    }
+    if byte(src, i) != 34 {
+        return false
+    }
+    if byte(src, i + 1) != 34 {
+        return false
+    }
+    byte(src, i + 2) == 34
+}
+
 fn classify_word(src: text, start: int, end: int) -> text {
-    if eq(slice(src, start, end), "fn") {
-        return "Fn"
+    w = slice(src, start, end)
+    if eq(w, "async") {
+        return "Async"
     }
-    if eq(slice(src, start, end), "if") {
-        return "If"
+    if eq(w, "await") {
+        return "Await"
     }
-    if eq(slice(src, start, end), "return") {
-        return "Return"
+    if eq(w, "break") {
+        return "Break"
     }
-    if eq(slice(src, start, end), "else") {
+    if eq(w, "const") {
+        return "Const"
+    }
+    if eq(w, "continue") {
+        return "Continue"
+    }
+    if eq(w, "copy") {
+        return "Copy"
+    }
+    if eq(w, "defer") {
+        return "Defer"
+    }
+    if eq(w, "drop") {
+        return "Drop"
+    }
+    if eq(w, "else") {
         return "Else"
     }
-    if eq(slice(src, start, end), "elif") {
+    if eq(w, "elif") {
         return "Elif"
     }
-    if eq(slice(src, start, end), "while") {
-        return "While"
+    if eq(w, "enum") {
+        return "Enum"
     }
-    if eq(slice(src, start, end), "pub") {
-        return "Pub"
+    if eq(w, "err") {
+        return "Err"
     }
-    if eq(slice(src, start, end), "use") {
-        return "Use"
+    if eq(w, "extern") {
+        return "Extern"
     }
-    if eq(slice(src, start, end), "mut") {
+    if eq(w, "false") {
+        return "False"
+    }
+    if eq(w, "fn") {
+        return "Fn"
+    }
+    if eq(w, "for") {
+        return "For"
+    }
+    if eq(w, "give") {
+        return "Give"
+    }
+    if eq(w, "if") {
+        return "If"
+    }
+    if eq(w, "impl") {
+        return "Impl"
+    }
+    if eq(w, "in") {
+        return "In"
+    }
+    if eq(w, "match") {
+        return "Match"
+    }
+    if eq(w, "module") {
+        return "Module"
+    }
+    if eq(w, "mut") {
         return "Mut"
     }
-    if eq(slice(src, start, end), "struct") {
+    if eq(w, "new") {
+        return "New"
+    }
+    if eq(w, "none") {
+        return "None"
+    }
+    if eq(w, "not") {
+        return "Not"
+    }
+    if eq(w, "ok") {
+        return "Ok"
+    }
+    if eq(w, "parallel") {
+        return "Parallel"
+    }
+    if eq(w, "pub") {
+        return "Pub"
+    }
+    if eq(w, "raise") {
+        return "Raise"
+    }
+    if eq(w, "ref") {
+        return "Ref"
+    }
+    if eq(w, "return") {
+        return "Return"
+    }
+    if eq(w, "self") {
+        return "SelfKw"
+    }
+    if eq(w, "some") {
+        return "Some"
+    }
+    if eq(w, "spawn") {
+        return "Spawn"
+    }
+    if eq(w, "struct") {
         return "Struct"
     }
+    if eq(w, "throws") {
+        return "Throws"
+    }
+    if eq(w, "trait") {
+        return "Trait"
+    }
+    if eq(w, "true") {
+        return "True"
+    }
+    if eq(w, "type") {
+        return "Type"
+    }
+    if eq(w, "unsafe") {
+        return "Unsafe"
+    }
+    if eq(w, "use") {
+        return "Use"
+    }
+    if eq(w, "void") {
+        return "Void"
+    }
+    if eq(w, "while") {
+        return "While"
+    }
+    if eq(w, "as") {
+        return "As"
+    }
+    if eq(w, "test") {
+        return "Test"
+    }
+    if eq(w, "bench") {
+        return "Bench"
+    }
+    if eq(w, "expect") {
+        return "Expect"
+    }
     "Ident"
+}
+
+# Past a string literal, including any `{...}` interpolation.
+#
+# The whole literal is one token, so a brace inside it has to be followed to its
+# match rather than ending the scan — the host counts depth for exactly this, and
+# a quote nested in an interpolation opens a string of its own.
+fn skip_string(src: text, idx: int, n: int) -> int {
+    i = idx + 1
+    while i < n {
+        c = byte(src, i)
+        if c == 34 {
+            return i + 1
+        }
+        if c == 10 {
+            return i
+        }
+        if c == 13 {
+            return i
+        }
+        if c == 92 {
+            i = i + 2
+        } elif c == 123 {
+            d = 1
+            i = i + 1
+            while i < n {
+                ic = byte(src, i)
+                if ic == 123 {
+                    d = d + 1
+                    i = i + 1
+                } elif ic == 125 {
+                    d = d - 1
+                    i = i + 1
+                    if d == 0 {
+                        break
+                    }
+                } elif ic == 34 {
+                    i = i + 1
+                    while i < n {
+                        qc = byte(src, i)
+                        if qc == 92 {
+                            i = i + 2
+                        } elif qc == 34 {
+                            i = i + 1
+                            break
+                        } else {
+                            i = i + 1
+                        }
+                    }
+                } else {
+                    i = i + 1
+                }
+            }
+        } else {
+            i = i + 1
+        }
+    }
+    i
+}
+
+fn skip_char(src: text, idx: int, n: int) -> int {
+    i = idx + 1
+    if i < n {
+        c = byte(src, i)
+        if c == 92 {
+            i = i + 1
+            if byte(src, i) == 120 {
+                # `\xNN` — the marker and both digits.
+                i = i + 3
+            } else {
+                i = i + 1
+            }
+        } elif c != 39 {
+            i = i + 1
+        }
+    }
+    if i < n {
+        if byte(src, i) == 39 {
+            i = i + 1
+        }
+    }
+    i
 }
 
 pub fn lex_file(path: text) {
@@ -77,110 +299,248 @@ pub fn lex_file(path: text) {
                 }
                 idx = idx + 1
             }
+        } elif is_triple(src, idx, n) {
+            idx = idx + 3
+            while idx < n {
+                if is_triple(src, idx, n) {
+                    idx = idx + 3
+                    break
+                }
+                idx = idx + 1
+            }
+        } elif c == 98 && nxt == 34 {
+            idx = skip_string(src, idx + 1, n)
+            emit_kind("Bytes")
         } elif is_ident_start(c) {
             start = idx
             idx = idx + 1
             while idx < n {
-                ch = byte(src, idx)
-                if is_ident_cont(ch) {
+                if is_ident_cont(byte(src, idx)) {
                     idx = idx + 1
                 } else {
                     break
                 }
             }
-            if 1 > 0 {
-                emit_kind(classify_word(src, start, idx))
-            }
+            emit_kind(classify_word(src, start, idx))
         } elif is_digit(c) {
-            idx = idx + 1
-            while idx < n {
-                ch = byte(src, idx)
-                if is_digit(ch) || ch == 95 {
+            isfloat = 0
+            if c == 48 && (nxt == 120 || nxt == 88) {
+                idx = idx + 2
+                while idx < n {
+                    if is_hex(byte(src, idx)) || byte(src, idx) == 95 {
+                        idx = idx + 1
+                    } else {
+                        break
+                    }
+                }
+            } elif c == 48 && (nxt == 98 || nxt == 66) {
+                idx = idx + 2
+                while idx < n {
+                    ch = byte(src, idx)
+                    if ch == 48 || ch == 49 || ch == 95 {
+                        idx = idx + 1
+                    } else {
+                        break
+                    }
+                }
+            } else {
+                while idx < n {
+                    ch = byte(src, idx)
+                    if is_digit(ch) || ch == 95 {
+                        idx = idx + 1
+                    } else {
+                        break
+                    }
+                }
+                # A dot only continues the number when a digit follows it, so
+                # `0..n` stays an Int and a range rather than a malformed float.
+                if byte(src, idx) == 46 && is_digit(byte(src, idx + 1)) {
+                    isfloat = 1
                     idx = idx + 1
-                } else {
-                    break
+                    while idx < n {
+                        ch = byte(src, idx)
+                        if is_digit(ch) || ch == 95 {
+                            idx = idx + 1
+                        } else {
+                            break
+                        }
+                    }
+                }
+                # An exponent only counts when there was no fractional part:
+                # the host returns as soon as it has consumed one, so `6.02e+23`
+                # is the float `6.02` followed by `e`, `+` and `23`.
+                if isfloat == 0 {
+                    ec = byte(src, idx)
+                    if ec == 101 || ec == 69 {
+                        isfloat = 1
+                        idx = idx + 1
+                        sc = byte(src, idx)
+                        if sc == 43 || sc == 45 {
+                            idx = idx + 1
+                        }
+                        while idx < n {
+                            ch = byte(src, idx)
+                            if is_digit(ch) || ch == 95 {
+                                idx = idx + 1
+                            } else {
+                                break
+                            }
+                        }
+                    }
                 }
             }
-            if 1 > 0 {
+            if isfloat == 1 {
+                emit_kind("Float")
+            } else {
                 emit_kind("Int")
             }
         } elif c == 34 {
-            idx = idx + 1
-            while idx < n {
-                ch = byte(src, idx)
-                if ch == 34 {
-                    idx = idx + 1
-                    break
-                }
-                idx = idx + 1
-            }
-            if 1 > 0 {
-                emit_kind("String")
-            }
+            idx = skip_string(src, idx, n)
+            emit_kind("String")
+        } elif c == 39 {
+            idx = skip_char(src, idx, n)
+            emit_kind("Char")
         } elif c == 40 {
             idx = idx + 1
-            if 1 > 0 {
-                emit_kind("LParen")
-            }
+            emit_kind("LParen")
         } elif c == 41 {
             idx = idx + 1
-            if 1 > 0 {
-                emit_kind("RParen")
-            }
+            emit_kind("RParen")
         } elif c == 123 {
             idx = idx + 1
-            if 1 > 0 {
-                emit_kind("LBrace")
-            }
+            emit_kind("LBrace")
         } elif c == 125 {
             idx = idx + 1
-            if 1 > 0 {
-                emit_kind("RBrace")
-            }
+            emit_kind("RBrace")
+        } elif c == 91 {
+            idx = idx + 1
+            emit_kind("LBracket")
+        } elif c == 93 {
+            idx = idx + 1
+            emit_kind("RBracket")
         } elif c == 44 {
             idx = idx + 1
-            if 1 > 0 {
-                emit_kind("Comma")
-            }
+            emit_kind("Comma")
+        } elif c == 59 {
+            idx = idx + 1
+            emit_kind("Semicolon")
         } elif c == 58 {
             idx = idx + 1
-            if 1 > 0 {
-                emit_kind("Colon")
-            }
+            emit_kind("Colon")
         } elif c == 43 {
             idx = idx + 1
-            if 1 > 0 {
-                emit_kind("Plus")
-            }
+            emit_kind("Plus")
+        } elif c == 42 {
+            idx = idx + 1
+            emit_kind("Star")
+        } elif c == 47 {
+            idx = idx + 1
+            emit_kind("Slash")
+        } elif c == 37 {
+            idx = idx + 1
+            emit_kind("Percent")
+        } elif c == 94 {
+            idx = idx + 1
+            emit_kind("Caret")
+        } elif c == 126 {
+            idx = idx + 1
+            emit_kind("Tilde")
+        } elif c == 64 {
+            idx = idx + 1
+            emit_kind("At")
         } elif c == 45 {
             if nxt == 62 {
                 idx = idx + 2
-                if 1 > 0 {
-                    emit_kind("Arrow")
+                emit_kind("Arrow")
+            } else {
+                idx = idx + 1
+                emit_kind("Minus")
+            }
+        } elif c == 46 {
+            if nxt == 46 {
+                third = byte(src, idx + 2)
+                if third == 61 {
+                    idx = idx + 3
+                    emit_kind("DotDotEq")
+                } elif third == 46 {
+                    idx = idx + 3
+                    emit_kind("DotDotDot")
+                } else {
+                    idx = idx + 2
+                    emit_kind("DotDot")
                 }
             } else {
                 idx = idx + 1
-                if 1 > 0 {
-                    emit_kind("Minus")
-                }
+                emit_kind("Dot")
+            }
+        } elif c == 61 {
+            if nxt == 61 {
+                idx = idx + 2
+                emit_kind("EqEq")
+            } elif nxt == 62 {
+                idx = idx + 2
+                emit_kind("FatArrow")
+            } else {
+                idx = idx + 1
+                emit_kind("Eq")
+            }
+        } elif c == 33 {
+            if nxt == 61 {
+                idx = idx + 2
+                emit_kind("NotEq")
+            } else {
+                idx = idx + 1
+                emit_kind("Bang")
+            }
+        } elif c == 60 {
+            if nxt == 61 {
+                idx = idx + 2
+                emit_kind("Le")
+            } elif nxt == 60 {
+                idx = idx + 2
+                emit_kind("Shl")
+            } else {
+                idx = idx + 1
+                emit_kind("Lt")
             }
         } elif c == 62 {
             if nxt == 61 {
                 idx = idx + 2
-                if 1 > 0 {
-                    emit_kind("Ge")
-                }
+                emit_kind("Ge")
+            } elif nxt == 62 {
+                idx = idx + 2
+                emit_kind("Shr")
             } else {
                 idx = idx + 1
-                if 1 > 0 {
-                    emit_kind("Gt")
-                }
+                emit_kind("Gt")
+            }
+        } elif c == 38 {
+            if nxt == 38 {
+                idx = idx + 2
+                emit_kind("AndAnd")
+            } else {
+                idx = idx + 1
+                emit_kind("Amp")
+            }
+        } elif c == 124 {
+            if nxt == 124 {
+                idx = idx + 2
+                emit_kind("OrOr")
+            } else {
+                idx = idx + 1
+                emit_kind("Pipe")
+            }
+        } elif c == 63 {
+            if nxt == 63 {
+                idx = idx + 2
+                emit_kind("QuestionQuestion")
+            } else {
+                idx = idx + 1
+                emit_kind("Question")
             }
         } else {
             idx = idx + 1
-            if 1 > 0 {
-                emit_kind("Invalid")
-            }
+            emit_kind("Invalid")
         }
     }
 }

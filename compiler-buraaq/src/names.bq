@@ -1,10 +1,24 @@
-# M5 — name table for the golden subset: fn / param / local / builtin / fnref
+# M18 — name table across every construct the emitter can lower.
+#
+# Each identifier use is classified as a builtin, a local, or a reference to a
+# function, and `bootstrap_m5` compares the stream against the same walk over the
+# host AST. It used to carry at most two parameters in `p0`/`p1` and know only
+# `if` and `return`, so a third parameter or a `while` made it report a local as
+# a function. Locals now live in a set that grows as bindings are met, which is
+# what lets `for` variables and assignments count as locals.
 use scan.scan_ident_end
 use scan.scan_is_digit
 use scan.scan_is_ident_start
+use scan.scan_op_at
+use scan.scan_op_len
 use scan.scan_skip
+use scan.scan_skip_string
 use scan.scan_skip_type
 use scan.scan_word_is
+use std.collections.set_add
+use std.collections.set_free
+use std.collections.set_has
+use std.collections.set_new
 use std.fs.read
 use std.io.println
 use std.text.byte
@@ -12,36 +26,36 @@ use std.text.eq
 use std.text.len
 use std.text.slice
 
-fn n_bind(name: text, p0: text, p1: text, np: int) {
+fn n_class(name: text, locals: text) -> int {
     if eq(name, "print") {
         println("builtin")
         println(name)
-    } elif eq(name, "println") {
+        return 0
+    }
+    if eq(name, "println") {
         println("builtin")
         println(name)
-    } elif np > 0 {
-        if eq(name, p0) {
-            println("local")
-            println(name)
-        } elif np > 1 {
-            if eq(name, p1) {
-                println("local")
-                println(name)
-            } else {
-                println("fnref")
-                println(name)
-            }
-        } else {
-            println("fnref")
-            println(name)
-        }
-    } else {
-        println("fnref")
-        println(name)
+        return 0
     }
+    if set_has(locals, name) == 1 {
+        println("local")
+        println(name)
+        return 0
+    }
+    println("fnref")
+    println(name)
+    0
 }
 
-fn n_args(src: text, idx: int, n: int, p0: text, p1: text, np: int) -> int {
+# A binding is a local from here on, and reports as one where it is written.
+fn n_bind(locals: text, name: text) -> int {
+    set_add(locals, name)
+    println("local")
+    println(name)
+    0
+}
+
+fn n_args(src: text, idx: int, n: int, locals: text) -> int {
     i = scan_skip(src, idx, n)
     if byte(src, i) == 40 {
         i = i + 1
@@ -50,10 +64,10 @@ fn n_args(src: text, idx: int, n: int, p0: text, p1: text, np: int) -> int {
     if byte(src, i) == 41 {
         return i + 1
     }
-    i = n_expr(src, i, n, p0, p1, np)
+    i = n_expr(src, i, n, locals)
     i = scan_skip(src, i, n)
     while byte(src, i) == 44 {
-        i = n_expr(src, i + 1, n, p0, p1, np)
+        i = n_expr(src, i + 1, n, locals)
         i = scan_skip(src, i, n)
     }
     if byte(src, i) == 41 {
@@ -62,9 +76,27 @@ fn n_args(src: text, idx: int, n: int, p0: text, p1: text, np: int) -> int {
     i
 }
 
-fn n_prefix(src: text, idx: int, n: int, p0: text, p1: text, np: int) -> int {
+fn n_prefix(src: text, idx: int, n: int, locals: text) -> int {
     i = scan_skip(src, idx, n)
     c = byte(src, i)
+    if c == 40 {
+        i = n_expr(src, i + 1, n, locals)
+        i = scan_skip(src, i, n)
+        if byte(src, i) == 41 {
+            i = i + 1
+        }
+        return i
+    }
+    # `-x` and `!x` name nothing themselves; the operand still does.
+    if c == 45 {
+        return n_prefix(src, i + 1, n, locals)
+    }
+    if c == 33 {
+        return n_prefix(src, i + 1, n, locals)
+    }
+    if c == 34 {
+        return scan_skip_string(src, i, n)
+    }
     if scan_is_digit(c) {
         e = i
         while e < n {
@@ -79,66 +111,151 @@ fn n_prefix(src: text, idx: int, n: int, p0: text, p1: text, np: int) -> int {
     if scan_is_ident_start(c) {
         e = scan_ident_end(src, i, n)
         name = slice(src, i, e)
+        # The host reads these as literals, so they name nothing.
+        if eq(name, "true") {
+            return e
+        }
+        if eq(name, "false") {
+            return e
+        }
         i = scan_skip(src, e, n)
         if byte(src, i) == 40 {
-            n_bind(name, p0, p1, np)
-            return n_args(src, i, n, p0, p1, np)
+            n_class(name, locals)
+            return n_args(src, i, n, locals)
         }
-        n_bind(name, p0, p1, np)
+        # A field names its base and not the field: `p.x` mentions `p`. The
+        # second byte has to be an identifier start or this is the `..` of a
+        # range, whose left bound has already been reported.
+        if byte(src, i) == 46 {
+            if scan_is_ident_start(byte(src, i + 1)) {
+                n_class(name, locals)
+                return scan_ident_end(src, i + 1, n)
+            }
+        }
+        if byte(src, i) == 91 {
+            n_class(name, locals)
+            i = n_expr(src, i + 1, n, locals)
+            i = scan_skip(src, i, n)
+            if byte(src, i) == 93 {
+                i = i + 1
+            }
+            return i
+        }
+        n_class(name, locals)
         return e
     }
     i
 }
 
-fn n_expr(src: text, idx: int, n: int, p0: text, p1: text, np: int) -> int {
-    i = n_prefix(src, idx, n, p0, p1, np)
-    i = scan_skip(src, i, n)
-    c = byte(src, i)
-    nxt = byte(src, i + 1)
-    if c == 43 {
-        return n_prefix(src, i + 1, n, p0, p1, np)
-    }
-    if c == 45 {
-        if nxt != 62 {
-            return n_prefix(src, i + 1, n, p0, p1, np)
+fn n_expr(src: text, idx: int, n: int, locals: text) -> int {
+    i = n_prefix(src, idx, n, locals)
+    hops = 0
+    while i < n {
+        hops = hops + 1
+        if hops > n + 4 {
+            break
         }
-    }
-    if c == 62 {
-        if nxt == 61 {
-            return n_prefix(src, i + 2, n, p0, p1, np)
+        i = scan_skip(src, i, n)
+        op = scan_op_at(src, i, n)
+        if eq(op, "") {
+            return i
         }
-        return n_prefix(src, i + 1, n, p0, p1, np)
+        i = n_prefix(src, i + scan_op_len(op), n, locals)
     }
     i
 }
 
-fn n_block(src: text, idx: int, n: int, p0: text, p1: text, np: int) -> int {
+fn n_stmt(src: text, idx: int, n: int, locals: text) -> int {
+    i = idx
+    if scan_word_is(src, i, n, "if") {
+        return n_if(src, i, n, locals)
+    }
+    if scan_word_is(src, i, n, "while") {
+        i = scan_skip(src, i + 5, n)
+        i = n_expr(src, i, n, locals)
+        return n_block(src, i, n, locals)
+    }
+    if scan_word_is(src, i, n, "for") {
+        i = scan_skip(src, i + 3, n)
+        e = scan_ident_end(src, i, n)
+        n_bind(locals, slice(src, i, e))
+        i = scan_skip(src, e, n)
+        if scan_word_is(src, i, n, "in") {
+            i = scan_skip(src, i + 2, n)
+        }
+        i = n_expr(src, i, n, locals)
+        i = scan_skip(src, i, n)
+        if byte(src, i) == 46 {
+            i = i + 2
+            if byte(src, i) == 61 {
+                i = i + 1
+            }
+        }
+        i = n_expr(src, i, n, locals)
+        return n_block(src, i, n, locals)
+    }
+    if scan_word_is(src, i, n, "break") {
+        return i + 5
+    }
+    if scan_word_is(src, i, n, "continue") {
+        return i + 8
+    }
+    if scan_word_is(src, i, n, "return") {
+        i = scan_skip(src, i + 6, n)
+        if byte(src, i) == 125 {
+            return i
+        }
+        return n_expr(src, i, n, locals)
+    }
+    # `name = expr` binds, but `name == expr` compares.
+    if scan_is_ident_start(byte(src, i)) {
+        e = scan_ident_end(src, i, n)
+        j = scan_skip(src, e, n)
+        if byte(src, j) == 61 {
+            if byte(src, j + 1) != 61 {
+                n_bind(locals, slice(src, i, e))
+                return n_expr(src, j + 1, n, locals)
+            }
+        }
+    }
+    n_expr(src, i, n, locals)
+}
+
+fn n_block(src: text, idx: int, n: int, locals: text) -> int {
     i = scan_skip(src, idx, n)
     if byte(src, i) == 123 {
         i = i + 1
     }
     i = scan_skip(src, i, n)
+    hops = 0
     while i < n {
+        hops = hops + 1
+        if hops > n + 4 {
+            break
+        }
         if byte(src, i) == 125 {
             return i + 1
         }
-        if scan_word_is(src, i, n, "if") {
-            i = n_if(src, i, n, p0, p1, np)
-        } elif scan_word_is(src, i, n, "return") {
-            i = scan_skip(src, i + 6, n)
-            i = n_expr(src, i, n, p0, p1, np)
-        } else {
-            i = n_expr(src, i, n, p0, p1, np)
-        }
+        i = n_stmt(src, i, n, locals)
         i = scan_skip(src, i, n)
     }
     i
 }
 
-fn n_if(src: text, idx: int, n: int, p0: text, p1: text, np: int) -> int {
+fn n_if(src: text, idx: int, n: int, locals: text) -> int {
     i = scan_skip(src, idx + 2, n)
-    i = n_expr(src, i, n, p0, p1, np)
-    n_block(src, i, n, p0, p1, np)
+    i = n_expr(src, i, n, locals)
+    i = n_block(src, i, n, locals)
+    i = scan_skip(src, i, n)
+    # `elif` is the `if` of the else branch: +2 leaves `idx + 2` on its body.
+    if scan_word_is(src, i, n, "elif") {
+        return n_if(src, i + 2, n, locals)
+    }
+    if scan_word_is(src, i, n, "else") {
+        i = scan_skip(src, i + 4, n)
+        return n_block(src, i, n, locals)
+    }
+    i
 }
 
 fn n_fn(src: text, idx: int, n: int) -> int {
@@ -146,13 +263,11 @@ fn n_fn(src: text, idx: int, n: int) -> int {
     e = scan_ident_end(src, i, n)
     println("fn")
     println(slice(src, i, e))
+    locals = set_new()
     i = scan_skip(src, e, n)
     if byte(src, i) == 40 {
         i = i + 1
     }
-    p0 = "_"
-    p1 = "_"
-    np = 0
     i = scan_skip(src, i, n)
     while i < n {
         if byte(src, i) == 41 {
@@ -163,13 +278,7 @@ fn n_fn(src: text, idx: int, n: int) -> int {
         pname = slice(src, i, e)
         println("param")
         println(pname)
-        if np == 0 {
-            p0 = pname
-            np = 1
-        } else {
-            p1 = pname
-            np = 2
-        }
+        set_add(locals, pname)
         i = scan_skip(src, e, n)
         if byte(src, i) == 58 {
             i = scan_skip_type(src, i + 1, n)
@@ -185,7 +294,9 @@ fn n_fn(src: text, idx: int, n: int) -> int {
             i = scan_skip_type(src, i + 2, n)
         }
     }
-    n_block(src, i, n, p0, p1, np)
+    i = n_block(src, i, n, locals)
+    set_free(locals)
+    i
 }
 
 pub fn dump_names(path: text) {

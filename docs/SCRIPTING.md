@@ -2,13 +2,13 @@
 
 Buraaq’s **core** model is native AOT (`buraaq build` / `buraaq run`). No GC.
 
-For a terminal edit loop, use **opt-in** scripting (same language, MIR interpreter):
+For a terminal edit loop, `buraaq`, `-e`, and `script` wrap a snippet in `fn main` and compile it with clang (same path as `run`, not a second interpreter):
 
 ## Check install
 
 ```bash
-buraaq --version    # version, host, scripting line, exe path
-buraaq doctor       # sysroot + clang + scripting probe
+buraaq --version
+buraaq doctor       # sysroot + clang; scripting line
 ```
 
 ## Interactive REPL
@@ -39,9 +39,9 @@ fn main() {
 
 | Command | Role |
 |---------|------|
-| `buraaq` / `repl` | Interactive terminal |
+| `buraaq` / `repl` / `shell` | Interactive terminal (clang per line) |
 | `buraaq -e` | Eval snippet |
-| `buraaq script` | Run a `.bq` file without linking |
+| `buraaq script` | Run a `.bq` file |
 | `buraaq run` | Native AOT binary (product path) |
 
-Clang is required for `run`/`build`. Scripting works with only the `buraaq` binary + sysroot.
+Clang is required for `run` / `build` / the shell / `-e` / `script`.

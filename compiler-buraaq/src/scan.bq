@@ -69,5 +69,147 @@ pub fn scan_word_is(src: text, idx: int, n: int, w: text) -> bool {
 
 pub fn scan_skip_type(src: text, idx: int, n: int) -> int {
     i = scan_skip(src, idx, n)
-    scan_ident_end(src, i, n)
+    if byte(src, i) == 42 {
+        i = scan_skip(src, i + 1, n)
+        if scan_word_is(src, i, n, "mut") {
+            i = scan_skip(src, i + 3, n)
+        } elif scan_word_is(src, i, n, "const") {
+            i = scan_skip(src, i + 5, n)
+        }
+    }
+    i = scan_ident_end(src, i, n)
+    hops = 0
+    while hops < 6 {
+        hops = hops + 1
+        if byte(src, i) == 46 {
+            i = scan_ident_end(src, i + 1, n)
+        } elif byte(src, i) == 91 {
+            d = 1
+            i = i + 1
+            while i < n {
+                c = byte(src, i)
+                if c == 91 {
+                    d = d + 1
+                }
+                if c == 93 {
+                    d = d - 1
+                    if d == 0 {
+                        i = i + 1
+                        break
+                    }
+                }
+                i = i + 1
+            }
+        } else {
+            break
+        }
+    }
+    i
+}
+
+# Past a string literal, following any `{...}` to its match. Interpolation is
+# skipped rather than descended into: the host reads a string as one literal, so
+# a walker that looked inside would report names the host never mentions.
+pub fn scan_skip_string(src: text, idx: int, n: int) -> int {
+    i = idx + 1
+    while i < n {
+        c = byte(src, i)
+        if c == 34 {
+            return i + 1
+        }
+        if c == 92 {
+            i = i + 2
+        } elif c == 123 {
+            d = 1
+            i = i + 1
+            while i < n {
+                ic = byte(src, i)
+                if ic == 123 {
+                    d = d + 1
+                } elif ic == 125 {
+                    d = d - 1
+                }
+                i = i + 1
+                if d == 0 {
+                    break
+                }
+            }
+        } else {
+            i = i + 1
+        }
+    }
+    i
+}
+
+# The host name of the binary operator at `i`, or "" when there is none.
+# Two-character operators are tested first so `>=` is not read as `>` then `=`,
+# and `->` is not read as `-`.
+pub fn scan_op_at(src: text, i: int, n: int) -> text {
+    c = byte(src, i)
+    d = byte(src, i + 1)
+    if c == 61 && d == 61 {
+        return "EqEq"
+    }
+    if c == 33 && d == 61 {
+        return "NotEq"
+    }
+    if c == 60 && d == 61 {
+        return "Le"
+    }
+    if c == 62 && d == 61 {
+        return "Ge"
+    }
+    if c == 38 && d == 38 {
+        return "AndAnd"
+    }
+    if c == 124 && d == 124 {
+        return "OrOr"
+    }
+    if c == 60 {
+        return "Lt"
+    }
+    if c == 62 {
+        return "Gt"
+    }
+    if c == 43 {
+        return "Plus"
+    }
+    if c == 45 {
+        if d == 62 {
+            return ""
+        }
+        return "Minus"
+    }
+    if c == 42 {
+        return "Star"
+    }
+    if c == 47 {
+        return "Slash"
+    }
+    if c == 37 {
+        return "Percent"
+    }
+    ""
+}
+
+pub fn scan_op_len(op: text) -> int {
+    if eq(op, "EqEq") {
+        return 2
+    }
+    if eq(op, "NotEq") {
+        return 2
+    }
+    if eq(op, "Le") {
+        return 2
+    }
+    if eq(op, "Ge") {
+        return 2
+    }
+    if eq(op, "AndAnd") {
+        return 2
+    }
+    if eq(op, "OrOr") {
+        return 2
+    }
+    1
 }

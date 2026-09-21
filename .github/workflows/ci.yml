@@ -6,8 +6,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
-    name: compiler tests
+  selfhost:
+    name: self-host
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -15,13 +15,23 @@ jobs:
         os: [windows-latest, ubuntu-latest]
     steps:
       - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Build CLI
-        working-directory: compiler
-        run: cargo build -p buraaq
-      - name: Unit tests
-        working-directory: compiler
-        run: cargo test --workspace --lib
-      - name: CLI version
-        run: compiler/target/debug/buraaq --version
+      - name: Install clang and lld (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y clang lld
+      - name: Check clang
         shell: bash
+        run: clang --version || "/c/Program Files/LLVM/bin/clang" --version
+      - name: Self-host tests
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: powershell -File scripts/selfhost-test.ps1
+      - name: Product verify
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: powershell -File scripts/selfhost-verify.ps1
+      - name: Self-host tests
+        if: runner.os != 'Windows'
+        run: bash scripts/selfhost-test.sh
+      - name: Product verify
+        if: runner.os != 'Windows'
+        run: bash scripts/selfhost-verify.sh

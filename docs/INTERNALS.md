@@ -1,60 +1,36 @@
 # Compiler internals
 
-High-level map of the Rust reference compiler (`compiler/`).
+High-level map of the product compiler (`compiler-buraaq/`).
 
 ## Pipeline
 
 ```
 .bq source
-  → Lexer (buraaq_lexer)
-  → Parser + recovery (buraaq_parser)
-  → Semantic: resolve, infer, ownership, borrow (buraaq_semantic)
-  → MIR lower (buraaq_mir::lower)
-  → MIR optimize (buraaq_mir::opt)     ← NEW
-  → LLVM IR text (buraaq_codegen)
-  → clang link + runtime C objects
+  → Lexer (`src/lexer.bq`)
+  → Parser (`src/parser.bq`)
+  → Names (`src/names.bq`)
+  → MIR subset (`src/mir.bq`)
+  → LLVM IR text (`src/llvm.bq`)
+  → clang link + `stdlib/runtime/buraaq_rt.c`
   → native executable
 ```
 
-## Crate responsibilities
+The driver is `src/main.bq`: `new` / `run` / `build` / `test` / `doctor` / `script` / `-e` / interactive shell.
 
-| Crate | Role |
-|-------|------|
-| `source` | Spans, files, line/column |
-| `diagnostics` | Structured errors, LSP adapter, snapshots |
-| `ast` | Untyped/typed syntax tree |
-| `types` | Type interner, DefId |
-| `ownership` / `borrow` | Memory safety passes |
-| `mir` | Mid-level IR + optimizations |
-| `codegen` | LLVM emission + link |
-| `driver` | End-to-end compile API |
-| `frontend` | IDE analysis entry |
-| `lsp` | Language Server |
-| `pkg` | Projects, lockfile, cache |
+## Modules
 
-## MIR optimization (measured)
-
-Pass order in `mir/src/opt/mod.rs`:
-
-1. Constant folding (+ branch folding)
-2. CFG simplification (unreachable blocks)
-3. Small-call inlining
-4. Dead code elimination
-5. CFG simplification (again)
-
-Stats returned in `CompileOutput.mir_opt_stats`.
-
-## Architectural debt (pre-1.0 refactor targets)
-
-1. **Single-file project mode** — multi-module graph exists in `pkg` but driver builds entry only
-2. **AST-level ownership** — should migrate to MIR + GFA (`docs/adr/0002`)
-3. **Hand-written LLVM IR** — no LLVM C API; limits advanced opts
-4. **Stdlib import resolution** — `use std.*` parses; full resolution incomplete
-5. **Async/spawn lowering** — runtime exists; MIR codegen partial
-6. **Duplicate diagnostic handler state** — LSP vs CLI paths differ slightly
-7. **No incremental compilation** — file-level hash cache only
-
-Refactor priority before 1.0: (1) multi-module driver, (2) std import resolution, (3) async lowering.
+| File | Role |
+|------|------|
+| `src/scan.bq` | Byte scan helpers |
+| `src/lexer.bq` | Tokens |
+| `src/parser.bq` | Recursive-descent AST events |
+| `src/names.bq` | Functions, params, locals, builtins |
+| `src/mir.bq` | Mid-level ops for the guest subset |
+| `src/llvm.bq` | LLVM text + signatures + typed print |
+| `src/main.bq` | Product CLI |
+| `boot/stage0.ll` | Clone seed (clang-link, then rebuild) |
+| `golden/` | Frozen tokens / AST / sample |
+| `selftest/main.bq` | `buraaq test` gold (`413489`) |
 
 ## Service runtime
 
@@ -62,26 +38,17 @@ Refactor priority before 1.0: (1) multi-module driver, (2) std import resolution
 
 ## Ship
 
-`compiler/ship` packs native `.bur` archives and runs `buraaq dock`. See [SHIP.md](SHIP.md).
+`buraaq pack` / `ship` / `dock` use hashed `.bur` archives. See [SHIP.md](SHIP.md).
 
-## Bootstrap alignment
+## Bootstrap
 
-`compiler-buraaq/` ports components in dependency order (M3 lexer **PASS**, M4 parser guest). Rust crates remain source of truth until golden tests match. Track: [BOOTSTRAP.md](BOOTSTRAP.md).
+Clone + clang + `boot/stage0.ll` rebuilds the compiler. Track: [BOOTSTRAP.md](BOOTSTRAP.md).
 
-## Fuzzing surface
+## Tests
 
-| Component | Test |
-|-----------|------|
-| Lexer | `lexer/tests/fuzz.rs` |
-| Parser | `parser/tests/fuzz.rs` |
-| Manifest | `pkg/tests/fuzz_manifest.rs` |
-| Semantic | `semantic/tests/adversarial.rs` (hand-crafted) |
-
-## Sanitizer workflow (developers)
-
-```bash
-# Nightly Rust recommended
-RUSTFLAGS="-Zsanitizer=address" cargo test -p buraaq_parser
+```text
+powershell -File scripts/selfhost-test.ps1
+powershell -File scripts/selfhost-verify.ps1
 ```
 
 Invalid `.bq` must never abort the compiler process (except OOM).
