@@ -1,3 +1,6 @@
+*.sh text eol=lf
+*.yml text eol=lf
+
 # Product source is Buraaq (.bq). GitHub Linguist has no Buraaq entry yet;
 # vendor the packager/runtime so the bar is not "Rust 78%".
 *.bq linguist-detectable

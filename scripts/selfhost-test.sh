@@ -78,8 +78,10 @@ assert_selftest() {
   echo "PASS $label selftest -> $WANT"
 }
 
+echo "selfhost-test: clang=$clang_bin ($(command -v "$clang_bin" || echo missing)) ld.lld=$(command -v ld.lld || echo none)"
 hide_rustc
 stage0="$(find_stage0)"
+echo "selfhost-test: stage0=$stage0"
 product="$work/product"
 "$stage0" llvm "$GUEST_SRC" > "$work/guest.ll"
 link_guest "$work/guest.ll" "$product"

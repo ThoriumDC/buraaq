@@ -41,17 +41,88 @@ jobs:
         run: |
           clang --version || "/c/Program Files/LLVM/bin/clang" --version
           command -v ld.lld || command -v lld-link || echo "lld not on PATH (default linker will be used)"
+      - name: Probe Linux toolchain
+        if: runner.os == 'Linux'
+        run: |
+          set -eux
+          command -v clang
+          command -v ld || true
+          command -v ld.lld || true
+          printf 'int main(void){return 0;}\n' > /tmp/bq-tiny.c
+          clang -o /tmp/bq-tiny /tmp/bq-tiny.c
+          /tmp/bq-tiny
+          echo "tiny c ok"
+          clang -Wno-override-module -Wno-deprecated-declarations -O0 \
+            -o /tmp/bq-stage0 compiler-buraaq/boot/stage0.ll \
+            stdlib/runtime/buraaq_rt.c stdlib/runtime/buraaq_std.c -lpthread -lm
+          echo "stage0 link ok"
+          /tmp/bq-stage0 --version
+          echo "stage0 run ok"
+      - name: Probe Windows toolchain
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $clang = $env:BURAAQ_CLANG
+          if (-not $clang -or -not (Test-Path $clang)) { $clang = "C:\Program Files\LLVM\bin\clang.exe" }
+          if (-not (Test-Path $clang)) { throw "clang not found" }
+          & $clang --version
+          $c = Join-Path $env:TEMP "bq-tiny.c"
+          Set-Content -Encoding ascii -Path $c -Value "int main(void){return 0;}"
+          $exe = Join-Path $env:TEMP "bq-tiny.exe"
+          & $clang -o $exe $c
+          if ($LASTEXITCODE -ne 0) { throw "tiny c link failed $LASTEXITCODE" }
+          Write-Host "tiny c ok"
       - name: Self-host tests
         if: runner.os == 'Windows'
         shell: powershell
-        run: powershell -File scripts/selfhost-test.ps1
+        run: |
+          $out = Join-Path $env:TEMP "bq-selfhost-test.log"
+          & powershell -File scripts/selfhost-test.ps1 *>&1 | Tee-Object -FilePath $out
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            $tail = (Get-Content -Raw $out -ErrorAction SilentlyContinue)
+            if ($tail.Length -gt 1500) { $tail = $tail.Substring($tail.Length - 1500) }
+            Write-Host "::error::selfhost-test.ps1 exit $code $tail"
+            exit $code
+          }
       - name: Product verify
         if: runner.os == 'Windows'
         shell: powershell
-        run: powershell -File scripts/selfhost-verify.ps1
+        run: |
+          $out = Join-Path $env:TEMP "bq-selfhost-verify.log"
+          & powershell -File scripts/selfhost-verify.ps1 *>&1 | Tee-Object -FilePath $out
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            $tail = (Get-Content -Raw $out -ErrorAction SilentlyContinue)
+            if ($tail.Length -gt 1500) { $tail = $tail.Substring($tail.Length - 1500) }
+            Write-Host "::error::selfhost-verify.ps1 exit $code $tail"
+            exit $code
+          }
       - name: Self-host tests
         if: runner.os != 'Windows'
-        run: bash scripts/selfhost-test.sh
+        run: |
+          set +e
+          bash scripts/selfhost-test.sh > /tmp/bq-selfhost-test.out 2> /tmp/bq-selfhost-test.err
+          code=$?
+          echo "selfhost-test exit=$code"
+          tail -n 80 /tmp/bq-selfhost-test.out || true
+          tail -n 80 /tmp/bq-selfhost-test.err || true
+          if [ "$code" -ne 0 ]; then
+            detail="$(tr '\n' ' ' < /tmp/bq-selfhost-test.err | tail -c 800)"
+            echo "::error::selfhost-test.sh exit $code $detail"
+          fi
+          exit "$code"
       - name: Product verify
         if: runner.os != 'Windows'
-        run: bash scripts/selfhost-verify.sh
+        run: |
+          set +e
+          bash scripts/selfhost-verify.sh > /tmp/bq-selfhost-verify.out 2> /tmp/bq-selfhost-verify.err
+          code=$?
+          echo "selfhost-verify exit=$code"
+          tail -n 80 /tmp/bq-selfhost-verify.out || true
+          tail -n 80 /tmp/bq-selfhost-verify.err || true
+          if [ "$code" -ne 0 ]; then
+            detail="$(tr '\n' ' ' < /tmp/bq-selfhost-verify.err | tail -c 800)"
+            echo "::error::selfhost-verify.sh exit $code $detail"
+          fi
+          exit "$code"
