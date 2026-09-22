@@ -6354,13 +6354,9 @@ pub fn project_out(root: text) -> text {
     joinp(dir, concat(project_name(root), ".exe"))
 }
 
-extern c {
-    fn buraaq_chdir(path: c.text) -> c.int
-}
-
 pub fn run_project(root: text) -> int {
     if len(root) > 0 {
-        buraaq_chdir(root)
+        chdir(root)
         done = 1
     }
     src = project_entry(root)
