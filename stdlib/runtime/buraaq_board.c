@@ -11,10 +11,15 @@ static void sleep_ms(int ms) {
     }
 }
 #else
-#include <unistd.h>
+#include <errno.h>
+#include <time.h>
 static void sleep_ms(int ms) {
     if (ms > 0) {
-        usleep((useconds_t)ms * 1000u);
+        struct timespec ts;
+        ts.tv_sec = (time_t)(ms / 1000);
+        ts.tv_nsec = (long)((ms % 1000) * 1000000L);
+        while (nanosleep(&ts, &ts) != 0 && errno == EINTR) {
+        }
     }
 }
 #endif

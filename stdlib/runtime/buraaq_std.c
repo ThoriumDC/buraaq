@@ -263,7 +263,13 @@ void buraaq_time_sleep_ms(int64_t ms) {
 #ifdef _WIN32
     Sleep((DWORD)ms);
 #else
-    usleep((useconds_t)(ms * 1000));
+    {
+        struct timespec ts;
+        ts.tv_sec = (time_t)(ms / 1000);
+        ts.tv_nsec = (long)((ms % 1000) * 1000000L);
+        while (nanosleep(&ts, &ts) != 0 && errno == EINTR) {
+        }
+    }
 #endif
 }
 
