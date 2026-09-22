@@ -18,7 +18,7 @@ fi
 
 hide_rustc() {
   clang_dir="$(dirname "$(command -v "$clang_bin" 2>/dev/null || echo /usr/bin/clang)")"
-  export PATH="$clang_dir:/usr/bin:/bin"
+  export PATH="$clang_dir:/usr/lib/llvm-20/bin:/usr/lib/llvm-18/bin:/usr/bin:/bin:${PATH:-}"
   unset CARGO RUSTC CARGO_HOME RUSTUP_HOME || true
 }
 
@@ -28,8 +28,12 @@ mkdir -p "$work"
 link_guest() {
   local ir="$1"
   local exe="$2"
-  "$clang_bin" -Wno-override-module -Wno-deprecated-declarations -O2 -fuse-ld=lld \
-    -o "$exe" "$ir" "$RT" "$STD" -lpthread -lm
+  local extra=()
+  if command -v ld.lld >/dev/null 2>&1; then
+    extra+=(-fuse-ld=lld)
+  fi
+  "$clang_bin" -Wno-override-module -Wno-deprecated-declarations -O0 \
+    "${extra[@]}" -o "$exe" "$ir" "$RT" "$STD" -lpthread -lm
   chmod +x "$exe"
 }
 
@@ -40,6 +44,7 @@ find_compiler() {
     "$ROOT/dist/buraaq.exe" \
     "$ROOT/compiler-buraaq/target/debug/buraaq-compiler" \
     "$ROOT/compiler-buraaq/target/debug/buraaq-compiler.exe"; do
+    case "$c" in *.exe|*.EXE) continue ;; esac
     if [ -x "$c" ]; then
       ver="$("$c" --version 2>/dev/null || true)"
       if echo "$ver" | grep -q "sysroot: MISSING"; then continue; fi

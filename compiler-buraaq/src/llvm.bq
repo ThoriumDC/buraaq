@@ -6125,6 +6125,16 @@ fn l_windows() -> int {
     0
 }
 
+fn l_have_lld() -> int {
+    if exists("C:\\Program Files\\LLVM\\bin\\lld-link.exe") {
+        return 1
+    }
+    if exists("/usr/bin/ld.lld") {
+        return 1
+    }
+    0
+}
+
 # Compile `src` to `exe` by finding clang and the runtime.
 pub fn build_auto(src: text, exe: text) -> int {
     clang = find_clang()
@@ -6138,7 +6148,10 @@ pub fn build_auto(src: text, exe: text) -> int {
     argv_push(a, "-Wno-override-module")
     argv_push(a, "-Wno-deprecated-declarations")
     argv_push(a, "-O2")
-    argv_push(a, "-fuse-ld=lld")
+    if l_have_lld() == 1 {
+        argv_push(a, "-fuse-ld=lld")
+        done = 1
+    }
     argv_push(a, "-o")
     argv_push(a, exe)
     argv_push(a, ll)
@@ -6235,7 +6248,10 @@ pub fn build_file(src: text, exe: text, rt: text, clang: text) {
     argv_push(a, clang)
     argv_push(a, "-Wno-override-module")
     argv_push(a, "-O0")
-    argv_push(a, "-fuse-ld=lld")
+    if l_have_lld() == 1 {
+        argv_push(a, "-fuse-ld=lld")
+        done = 1
+    }
     argv_push(a, "-o")
     argv_push(a, exe)
     argv_push(a, ll)

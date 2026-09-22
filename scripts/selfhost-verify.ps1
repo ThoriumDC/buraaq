@@ -13,12 +13,19 @@ function Find-Clang {
     if (Test-Path $sidecar) { return $sidecar }
     $stock = "C:\Program Files\LLVM\bin\clang.exe"
     if (Test-Path $stock) { return $stock }
+    $cmd = Get-Command clang -ErrorAction SilentlyContinue
+    if ($cmd -and $cmd.Source) { return $cmd.Source }
     return "clang"
 }
 
 function Link-Guest($ir, $exe) {
     $libs = @("-lwininet", "-ladvapi32", "-lws2_32")
-    & $Clang -Wno-override-module -Wno-deprecated-declarations -O2 -fuse-ld=lld -o $exe $ir $Rt $Std @libs
+    $lld = @()
+    $clangDir = Split-Path $Clang
+    $lldLink = Join-Path $clangDir "lld-link.exe"
+    if (-not (Test-Path $lldLink)) { $lldLink = "C:\Program Files\LLVM\bin\lld-link.exe" }
+    if (Test-Path $lldLink) { $lld = @("-fuse-ld=lld") }
+    & $Clang -Wno-override-module -Wno-deprecated-declarations -O0 @lld -o $exe $ir $Rt $Std @libs
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path $exe)) { throw "clang link of $exe failed" }
 }
 
@@ -34,7 +41,12 @@ function Probe-Version($exe) {
 function Hide-Rustc {
     $clang = Find-Clang
     $clangDir = Split-Path $clang
-    $env:PATH = "$clangDir;C:\Windows\System32;C:\Windows"
+    $llvm = "C:\Program Files\LLVM\bin"
+    $parts = @()
+    if ($clangDir) { $parts += $clangDir }
+    if (Test-Path $llvm) { $parts += $llvm }
+    $kept = $env:PATH -split ';' | Where-Object { $_ -and $_ -notmatch '(?i)(\\cargo\\|\\rustc\\|\\rustup\\)' }
+    $env:PATH = ($parts + $kept) -join ';'
     foreach ($name in @("CARGO", "RUSTC", "CARGO_HOME", "RUSTUP_HOME")) {
         Remove-Item "Env:$name" -ErrorAction SilentlyContinue
     }

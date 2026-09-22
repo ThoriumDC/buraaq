@@ -17,10 +17,30 @@ jobs:
       - uses: actions/checkout@v5
       - name: Install clang and lld (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y clang lld
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld
+          if ! command -v ld.lld >/dev/null 2>&1; then
+            found="$(find /usr/lib /usr/bin -name 'ld.lld*' \( -type f -o -type l \) 2>/dev/null | head -n 1 || true)"
+            if [ -n "$found" ]; then
+              sudo ln -sf "$found" /usr/bin/ld.lld
+            fi
+          fi
+      - name: Put LLVM on PATH (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $llvm = "C:\Program Files\LLVM\bin"
+          if (Test-Path "$llvm\clang.exe") {
+            echo $llvm | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+            echo "BURAAQ_CLANG=$llvm\clang.exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          }
+          Get-ChildItem $llvm -ErrorAction SilentlyContinue | Where-Object { $_.Name -match 'clang|lld' } | Select-Object -ExpandProperty Name
       - name: Check clang
         shell: bash
-        run: clang --version || "/c/Program Files/LLVM/bin/clang" --version
+        run: |
+          clang --version || "/c/Program Files/LLVM/bin/clang" --version
+          command -v ld.lld || command -v lld-link || echo "lld not on PATH (default linker will be used)"
       - name: Self-host tests
         if: runner.os == 'Windows'
         shell: powershell
