@@ -46,6 +46,8 @@ typedef struct {
 static BqStream g_st[BQ_STREAM_MAX];
 static bq_sock g_listen = BQ_INVALID;
 static int g_wsa = 0;
+static char g_heard[16] = "";
+static int g_clip_seq = 0;
 
 static char *dup_str(const char *s) {
     if (!s) s = "";
@@ -491,6 +493,109 @@ int32_t buraaq_stream_wire(const char *url) {
     return stream_slot(fd, 1);
 }
 
+static const char *media_leaf(const char *path) {
+    const char *s = path ? path : "";
+    const char *slash = strrchr(s, '/');
+    const char *bslash = strrchr(s, '\\');
+    if (bslash && (!slash || bslash > slash)) slash = bslash;
+    return slash ? slash + 1 : s;
+}
+
+static unsigned char *read_file_bytes(const char *path, size_t *out_len) {
+    *out_len = 0;
+    FILE *f = fopen(path, "rb");
+    if (!f) return NULL;
+    if (fseek(f, 0, SEEK_END) != 0) {
+        fclose(f);
+        return NULL;
+    }
+    long n = ftell(f);
+    if (n < 0) {
+        fclose(f);
+        return NULL;
+    }
+    rewind(f);
+    unsigned char *buf = (unsigned char *)malloc((size_t)n + 1);
+    if (!buf) {
+        fclose(f);
+        return NULL;
+    }
+    size_t got = fread(buf, 1, (size_t)n, f);
+    fclose(f);
+    buf[got] = 0;
+    *out_len = got;
+    return buf;
+}
+
+static int32_t send_media(int32_t id, const char *kind, const char *path) {
+    BqStream *s = st_get(id);
+    if (!s || !path || !path[0]) return 0;
+    size_t flen = 0;
+    unsigned char *file = read_file_bytes(path, &flen);
+    if (!file) return 0;
+    const char *name = media_leaf(path);
+    size_t nlen = strlen(name);
+    if (nlen > 0xffff) nlen = 0xffff;
+    size_t total = 4 + 2 + nlen + flen;
+    unsigned char *pkt = (unsigned char *)malloc(total);
+    if (!pkt) {
+        free(file);
+        return 0;
+    }
+    memcpy(pkt, kind, 4);
+    pkt[4] = (unsigned char)(nlen & 0xff);
+    pkt[5] = (unsigned char)((nlen >> 8) & 0xff);
+    memcpy(pkt + 6, name, nlen);
+    if (flen) memcpy(pkt + 6 + nlen, file, flen);
+    free(file);
+    int rc = send_frame(s->fd, 2, pkt, total, s->client);
+    free(pkt);
+    return rc == 0 ? 1 : 0;
+}
+
+int32_t buraaq_stream_clip(int32_t id, const char *path) {
+    return send_media(id, "CLIP", path);
+}
+
+int32_t buraaq_stream_shot(int32_t id, const char *path) {
+    return send_media(id, "SHOT", path);
+}
+
+char *buraaq_stream_heard(void) {
+    return dup_str(g_heard);
+}
+
+static char *write_temp_media(const char *kind, const char *name, const unsigned char *data, size_t n) {
+    char dir[512];
+#ifdef _WIN32
+    DWORD m = GetTempPathA((DWORD)sizeof(dir), dir);
+    if (!m) snprintf(dir, sizeof(dir), ".\\");
+#else
+    const char *t = getenv("TMPDIR");
+    if (!t || !t[0]) t = "/tmp";
+    snprintf(dir, sizeof(dir), "%s", t);
+    size_t dl = strlen(dir);
+    if (dl && dir[dl - 1] != '/') strncat(dir, "/", sizeof(dir) - strlen(dir) - 1);
+#endif
+    g_clip_seq++;
+    char safe[256];
+    const char *leaf = (name && name[0]) ? name : "media.bin";
+    size_t si = 0;
+    for (size_t i = 0; leaf[i] && si + 1 < sizeof(safe); i++) {
+        char c = leaf[i];
+        if (c == '/' || c == '\\' || c == ':') c = '_';
+        safe[si++] = c;
+    }
+    safe[si] = 0;
+    char path[768];
+    snprintf(path, sizeof(path), "%sbq-%s-%d-%s", dir, kind, g_clip_seq, safe);
+    FILE *f = fopen(path, "wb");
+    if (!f) return dup_str("");
+    if (n) fwrite(data, 1, n, f);
+    fclose(f);
+    return dup_str(path);
+}
+
 int32_t buraaq_stream_say(int32_t id, const char *msg) {
     BqStream *s = st_get(id);
     if (!s) return 0;
@@ -501,14 +606,21 @@ int32_t buraaq_stream_say(int32_t id, const char *msg) {
 
 char *buraaq_stream_hear(int32_t id) {
     BqStream *s = st_get(id);
-    if (!s) return dup_str("");
+    if (!s) {
+        g_heard[0] = 0;
+        return dup_str("");
+    }
     for (;;) {
         int opcode = 0;
         unsigned char *payload = NULL;
         size_t plen = 0;
-        if (recv_frame(s->fd, &opcode, &payload, &plen) != 0) return dup_str("");
+        if (recv_frame(s->fd, &opcode, &payload, &plen) != 0) {
+            g_heard[0] = 0;
+            return dup_str("");
+        }
         if (opcode == 8) {
             free(payload);
+            g_heard[0] = 0;
             return dup_str("");
         }
         if (opcode == 9) {
@@ -520,7 +632,8 @@ char *buraaq_stream_hear(int32_t id) {
             free(payload);
             continue;
         }
-        if (opcode == 1 || opcode == 2) {
+        if (opcode == 1) {
+            snprintf(g_heard, sizeof(g_heard), "text");
             char *out = (char *)malloc(plen + 1);
             if (!out) {
                 free(payload);
@@ -530,6 +643,29 @@ char *buraaq_stream_hear(int32_t id) {
             out[plen] = 0;
             free(payload);
             return out;
+        }
+        if (opcode == 2) {
+            const char *kind = "clip";
+            if (plen >= 4 && memcmp(payload, "SHOT", 4) == 0) kind = "shot";
+            snprintf(g_heard, sizeof(g_heard), "%s", kind);
+            const char *name = "";
+            const unsigned char *body = payload;
+            size_t blen = plen;
+            if (plen >= 6 && (memcmp(payload, "CLIP", 4) == 0 || memcmp(payload, "SHOT", 4) == 0)) {
+                size_t nlen = (size_t)payload[4] | ((size_t)payload[5] << 8);
+                if (6 + nlen <= plen) {
+                    static char nm[256];
+                    size_t cpy = nlen < 255 ? nlen : 255;
+                    memcpy(nm, payload + 6, cpy);
+                    nm[cpy] = 0;
+                    name = nm;
+                    body = payload + 6 + nlen;
+                    blen = plen - 6 - nlen;
+                }
+            }
+            char *path = write_temp_media(kind, name, body, blen);
+            free(payload);
+            return path;
         }
         free(payload);
     }
@@ -554,7 +690,13 @@ void buraaq_stream_run(void) {
                 free(msg);
                 break;
             }
-            buraaq_stream_say(id, msg);
+            if (strcmp(g_heard, "clip") == 0) {
+                buraaq_stream_clip(id, msg);
+            } else if (strcmp(g_heard, "shot") == 0) {
+                buraaq_stream_shot(id, msg);
+            } else {
+                buraaq_stream_say(id, msg);
+            }
             free(msg);
         }
         buraaq_stream_hangup(id);

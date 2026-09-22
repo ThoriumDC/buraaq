@@ -10,8 +10,8 @@ Read in this order. Skip what you do not need.
 2. [Syntax](SYNTAX_REFERENCE.md)
 3. [The Book](BURAAQ_BOOK.md)
 3b. [Scripting](SCRIPTING.md) — `buraaq` / `-e` / `script` (clang per snippet)
-4. [Standard library](STDLIB.md) — including **Stream**, **Hold**, **Grid**
-5. [The stack](STACK.md) — Keel, Ship, Dock, Land, Mind, Strata
+4. [Standard library](STDLIB.md) — including **Stream**, **Gfx**, **Hold**, **Grid**
+5. [The stack](STACK.md) — Keel, Stream, Gfx, Hold, Grid, Ship, Dock, Land, Mind, Strata
 6. [Buraaq AI](AI.md) — `buraaq ai`, planner, OpenAI-compatible serve
 6b. [Strata](STRATA.md) — GPU → RAM → NVMe model residency
 
@@ -28,7 +28,8 @@ Read in this order. Skip what you do not need.
 - [Concurrency](CONCURRENCY.md)
 - [Unsafe](UNSAFE_BURAAQ.md)
 - [Performance](PERFORMANCE.md)
-- [Lumen](LUMEN.md) — optional native window (not the default path)
+- [Gfx](GFX.md) — game canvas and sound (`canvas` / `flip` / `held`); **NOVA** in `stdlib/examples/nova.bq`
+- [Lumen](LUMEN.md) — optional operator console (not the game surface)
 - `std.flowdesk` — borderless Windows shell + Vein (see [STDLIB.md](STDLIB.md); demo in private `buraaq-play`)
 - [Editors](../editors/README.md) — VS Code, Vim, Neovim, Sublime, Helix, Zed, JetBrains
 

@@ -552,7 +552,7 @@ use keel.{page, api, run}
 use tx.signed           # your module
 ```
 
-`connect`, `show`, and `keep` are not unique. Write `use db` or `use net` (and the same for lumen/flowdesk, hold/lumen).
+`connect`, `show`, and `keep` are not unique. Write `use db` or `use net` (and the same for lumen/flowdesk, hold/lumen). Unique game and live-media names (`canvas`, `flip`, `held`, `clip`, `shot`, `heard`) import themselves. Games: [GFX.md](GFX.md), `stdlib/examples/nova.bq`.
 
 Visibility: `pub` prefix exports item.
 

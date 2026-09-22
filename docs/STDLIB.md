@@ -117,7 +117,7 @@ println(col_mean(h, "cents"))
 
 ### `std.stream`
 
-Live framed messages — the Buraaq name for WebSockets. Not a browser API.
+Live framed messages — the Buraaq name for WebSockets. Not a browser API. Text, audio clips, and video shots share one wire.
 
 ```
 stream(9420)
@@ -129,17 +129,54 @@ A client:
 ```
 s = wire("ws://127.0.0.1:9420/")
 say(s, "hello")
-println(hear(s))
+clip(s, "step.wav")
+shot(s, "frame.png")
+msg = hear(s)
+kind = heard()
 hangup(s)
 ```
 
 | API | Description |
 |-----|-------------|
 | `stream(port)` | Bind |
-| `run_stream()` | Accept forever and echo |
+| `run_stream()` | Accept forever and echo text, clips, and shots |
 | `hail()` | Accept one client |
 | `wire(url)` | Connect `ws://host:port/path` |
-| `say` / `hear` / `hangup` | Text frames |
+| `say` / `hear` / `hangup` | Text frames; `hear` of a clip/shot returns a temp path |
+| `clip(id, path)` | Send a file as a binary audio frame |
+| `shot(id, path)` | Send a file as a binary video/image frame |
+| `heard()` | `"text"`, `"clip"`, `"shot"`, or empty |
+
+### `std.gfx`
+
+A software canvas, a window, and sound — the Buraaq game loop. Unique names; no `use`. Lumen is the operator console. Gfx is pixels.
+
+```
+canvas(320, 180, "dot")
+ink(40, 200, 90)
+wipe()
+box(20, 40, 24, 24)
+flip()
+if held("right") {
+    tone(440, 40)
+}
+play("step.wav")
+hush()
+```
+
+| API | Description |
+|-----|-------------|
+| `canvas(w, h, title)` | Open a framebuffer (and a window on the desktop) |
+| `ink(r, g, b)` | Set draw color |
+| `wipe` / `plot` / `box` / `dash` | Clear, point, filled rect, line |
+| `flip()` | Present the frame and pump input |
+| `held(name)` | 1 while a key is down, and only while the Gfx window is focused |
+| `pulse()` | Frames presented since `canvas` |
+| `play(path)` / `tone(hz, ms)` / `hush()` | File sound, beep (blocking), stop |
+
+`held` names: `left` / `right` / `up` / `down` / `escape` / `quit` / `space` / `enter` / `a`–`z`. The game is a **desktop window**, not the terminal — click it, then play. `BURAAQ_GFX_HEADLESS=1` keeps the pixels and skips the window.
+
+Playable example: `stdlib/examples/nova.bq` (**NOVA**). One-frame smoke: `stdlib/examples/gfx.bq`. Full page: [GFX.md](GFX.md).
 
 ### `std.time`
 
@@ -434,6 +471,8 @@ Native implementations linked automatically by `buraaq build`. No garbage collec
 | `buraaq_mutex_*` | sync |
 | `buraaq_process_exit_code` | process |
 | `buraaq_argv_new/push/free`, `buraaq_process_run` | process (argv, no shell) |
+| `buraaq_stream_*` | stream (text + clip/shot) |
+| `buraaq_gfx_*` | gfx (canvas + sound) |
 
 ## FFI example
 
@@ -460,10 +499,10 @@ Safe wrappers live in std modules; raw `extern c` calls stay in `unsafe` blocks.
 ## Testing
 
 The C runtime unit tests link every translation unit in `runtime/` —
-`buraaq_std.c` calls into grid, hold, stream, and server. See
+`buraaq_std.c` calls into grid, hold, stream, gfx, and server. See
 [stdlib/README.md](../stdlib/README.md#tests--benchmarks) for the exact command.
 
-Examples live in `stdlib/examples/` — one per major module group.
+Examples live in `stdlib/examples/` — one per major module group. Games: `nova.bq` (neon shooter), `gfx.bq` (one frame), `snake.bq`. Stream A/V without a peer: `stream_av.bq`.
 
 ## Compiler integration status
 

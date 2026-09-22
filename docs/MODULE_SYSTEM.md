@@ -65,7 +65,7 @@ use std.io.println             # still valid
 use tx.signed                  # your module; never auto-imported
 ```
 
-Drop the `std.` prefix. Unique stdlib names also import themselves (no `use`). A name exported by two std modules needs `use db` or `use net` (today: `connect`, `show`, `keep`). `std.service` is an alias of `keel`, so `page` / `run` auto-import as keel.
+Drop the `std.` prefix. Unique stdlib names also import themselves (no `use`). A name exported by two std modules needs `use db` or `use net` (today: `connect`, `show`, `keep`). `std.service` is an alias of `keel`, so `page` / `run` auto-import as keel. Game and live-media names (`canvas`, `flip`, `clip`, `shot`, `heard`) are unique.
 
 ### 4.2 Resolution order
 

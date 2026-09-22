@@ -1,0 +1,6 @@
+# Example: std.stream — text plus clip/shot without a live peer
+fn main() {
+    println(heard())
+    println(clip(0, "no-such.wav"))
+    println(shot(0, "no-such.png"))
+}

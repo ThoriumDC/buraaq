@@ -525,7 +525,7 @@ fn l_enum_tag_any(src: text, n: int, vname: text) -> int {
 # the source overlays these: l_bag_get takes the first `name:` it sees, so
 # collected signatures are concatenated in front.
 fn l_builtin_sigs() -> text {
-    ",print:0,println:0,print_int:0,print_float:0,print_bool:0,eprintln:0,exit:0,set_add_csv:0,set_free:0,vec_push_int:0,vec_push_text:0,vec_set_int:0,vec_set_text:0,vec_free:0,argv_free:0,stow:0,read:2,slice:2,arg:2,concat:2,char_of:2,set_new:2,vec_new:2,vec_get_text:2,getenv:2,parse:2,sha256:2,field:2,chat:2,pick:2,len:1,byte:1,eq:1,set_add:1,set_has:1,set_len:1,vec_len:1,vec_get_int:1,args:1,argv_new:1,argv_push:1,argv_run:1,write:1,append:1,exists:1,mkdir:1,chdir:1,abs_int:1,model:1,on:0,off:0,wait:0,printf:0,system:0,row:1,eye:1,hold:1,rows:1,sin:3,sqrt:3,clamp:3,dot:3,at:3,col_mean:3,async_io_read_line:2,read_line:2,page:0,api:0,run:0,store:0,key:0,origin:0,call:2,zeros:1,ones:1,from_csv:1,"
+    ",print:0,println:0,print_int:0,print_float:0,print_bool:0,eprintln:0,exit:0,set_add_csv:0,set_free:0,vec_push_int:0,vec_push_text:0,vec_set_int:0,vec_set_text:0,vec_free:0,argv_free:0,stow:0,read:2,slice:2,arg:2,concat:2,char_of:2,set_new:2,vec_new:2,vec_get_text:2,getenv:2,parse:2,sha256:2,field:2,chat:2,pick:2,len:1,byte:1,eq:1,set_add:1,set_has:1,set_len:1,vec_len:1,vec_get_int:1,args:1,argv_new:1,argv_push:1,argv_run:1,write:1,append:1,exists:1,mkdir:1,chdir:1,abs_int:1,model:1,on:0,off:0,wait:0,printf:0,system:0,row:1,eye:1,hold:1,rows:1,sin:3,sqrt:3,clamp:3,dot:3,at:3,col_mean:3,async_io_read_line:2,read_line:2,page:0,api:0,run:0,store:0,key:0,origin:0,call:2,zeros:1,ones:1,from_csv:1,stream:1,hail:1,wire:1,say:1,hear:2,hangup:0,run_stream:0,clip:1,shot:1,heard:2,canvas:1,ink:0,wipe:0,plot:0,box:0,dash:0,flip:0,held:1,pulse:1,play:0,tone:0,hush:0,"
 }
 
 # Std module leaf names. `use io` means std.io unless the project has src/io.bq.
@@ -604,6 +604,9 @@ fn l_std_mod(m: text) -> int {
         return 1
     }
     if eq(m, "flowdesk") {
+        return 1
+    }
+    if eq(m, "gfx") {
         return 1
     }
     0
@@ -2992,6 +2995,72 @@ fn l_call(src: text, name: text, idx: int, n: int, sink: text, pos: int, ptxt: t
     }
     if eq(name, "argv_free") {
         cal = "buraaq_argv_free"
+    }
+    if eq(name, "stream") {
+        cal = "buraaq_stream_bind"
+    }
+    if eq(name, "hail") {
+        cal = "buraaq_stream_hail"
+    }
+    if eq(name, "wire") {
+        cal = "buraaq_stream_wire"
+    }
+    if eq(name, "say") {
+        cal = "buraaq_stream_say"
+    }
+    if eq(name, "hear") {
+        cal = "buraaq_stream_hear"
+    }
+    if eq(name, "hangup") {
+        cal = "buraaq_stream_hangup"
+    }
+    if eq(name, "run_stream") {
+        cal = "buraaq_stream_run"
+    }
+    if eq(name, "clip") {
+        cal = "buraaq_stream_clip"
+    }
+    if eq(name, "shot") {
+        cal = "buraaq_stream_shot"
+    }
+    if eq(name, "heard") {
+        cal = "buraaq_stream_heard"
+    }
+    if eq(name, "canvas") {
+        cal = "buraaq_gfx_canvas"
+    }
+    if eq(name, "ink") {
+        cal = "buraaq_gfx_ink"
+    }
+    if eq(name, "wipe") {
+        cal = "buraaq_gfx_wipe"
+    }
+    if eq(name, "plot") {
+        cal = "buraaq_gfx_plot"
+    }
+    if eq(name, "box") {
+        cal = "buraaq_gfx_box"
+    }
+    if eq(name, "dash") {
+        cal = "buraaq_gfx_dash"
+    }
+    if eq(name, "flip") {
+        cal = "buraaq_gfx_flip"
+    }
+    if eq(name, "held") {
+        cal = "buraaq_gfx_held"
+    }
+    if eq(name, "pulse") {
+        cal = "buraaq_gfx_pulse"
+    }
+    if eq(name, "play") {
+        cal = "buraaq_gfx_play"
+    }
+    if eq(name, "tone") {
+        cal = "buraaq_gfx_tone"
+    }
+    if eq(name, "hush") {
+        cal = "buraaq_gfx_hush"
     }
     ty = "i32"
     dst = "%t{pos}"
@@ -5772,6 +5841,28 @@ fn ll_emit_module(path: text, sink: text) {
     l_emit(sink, "declare i32 @buraaq_grid_ones(i32, i32)")
     l_emit(sink, "declare i32 @buraaq_hold_from_csv(i8*)")
     l_emit(sink, "declare i32 @buraaq_hold_keep(i32, i8*, i8*)")
+    l_emit(sink, "declare i32 @buraaq_stream_bind(i32)")
+    l_emit(sink, "declare i32 @buraaq_stream_hail()")
+    l_emit(sink, "declare i32 @buraaq_stream_wire(i8*)")
+    l_emit(sink, "declare i32 @buraaq_stream_say(i32, i8*)")
+    l_emit(sink, "declare i8* @buraaq_stream_hear(i32)")
+    l_emit(sink, "declare void @buraaq_stream_hangup(i32)")
+    l_emit(sink, "declare void @buraaq_stream_run()")
+    l_emit(sink, "declare i32 @buraaq_stream_clip(i32, i8*)")
+    l_emit(sink, "declare i32 @buraaq_stream_shot(i32, i8*)")
+    l_emit(sink, "declare i8* @buraaq_stream_heard()")
+    l_emit(sink, "declare i32 @buraaq_gfx_canvas(i32, i32, i8*)")
+    l_emit(sink, "declare void @buraaq_gfx_ink(i32, i32, i32)")
+    l_emit(sink, "declare void @buraaq_gfx_wipe()")
+    l_emit(sink, "declare void @buraaq_gfx_plot(i32, i32)")
+    l_emit(sink, "declare void @buraaq_gfx_box(i32, i32, i32, i32)")
+    l_emit(sink, "declare void @buraaq_gfx_dash(i32, i32, i32, i32)")
+    l_emit(sink, "declare void @buraaq_gfx_flip()")
+    l_emit(sink, "declare i32 @buraaq_gfx_held(i8*)")
+    l_emit(sink, "declare i32 @buraaq_gfx_pulse()")
+    l_emit(sink, "declare void @buraaq_gfx_play(i8*)")
+    l_emit(sink, "declare void @buraaq_gfx_tone(i32, i32)")
+    l_emit(sink, "declare void @buraaq_gfx_hush()")
     l_emit(sink, "declare i32 @buraaq_pg_connect(i8*)")
     l_emit(sink, "declare i32 @buraaq_ui_show()")
     l_emit_strings(src, n, sink)
@@ -5985,6 +6076,32 @@ pub fn find_hold() -> text {
     hit
 }
 
+pub fn find_stream() -> text {
+    here = l_dir_of(arg(0))
+    hit = l_pick_file(
+        concat(here, "sysroot/runtime/buraaq_stream.c"),
+        concat(here, "../stdlib/runtime/buraaq_stream.c"),
+        concat(here, "../../stdlib/runtime/buraaq_stream.c"),
+        "stdlib/runtime/buraaq_stream.c",
+        "../stdlib/runtime/buraaq_stream.c",
+        "../../stdlib/runtime/buraaq_stream.c"
+    )
+    hit
+}
+
+pub fn find_gfx() -> text {
+    here = l_dir_of(arg(0))
+    hit = l_pick_file(
+        concat(here, "sysroot/runtime/buraaq_gfx.c"),
+        concat(here, "../stdlib/runtime/buraaq_gfx.c"),
+        concat(here, "../../stdlib/runtime/buraaq_gfx.c"),
+        "stdlib/runtime/buraaq_gfx.c",
+        "../stdlib/runtime/buraaq_gfx.c",
+        "../../stdlib/runtime/buraaq_gfx.c"
+    )
+    hit
+}
+
 pub fn find_std() -> text {
     here = l_dir_of(arg(0))
     hit = l_pick_file(
@@ -6050,11 +6167,24 @@ pub fn build_auto(src: text, exe: text) -> int {
         argv_push(a, hd)
         done = 1
     }
+    sm = find_stream()
+    if len(sm) > 0 {
+        argv_push(a, sm)
+        done = 1
+    }
+    gx = find_gfx()
+    if len(gx) > 0 {
+        argv_push(a, gx)
+        done = 1
+    }
     if l_windows() == 1 {
         argv_push(a, "-D_CRT_SECURE_NO_WARNINGS")
         argv_push(a, "-lwininet")
         argv_push(a, "-ladvapi32")
         argv_push(a, "-lws2_32")
+        argv_push(a, "-lgdi32")
+        argv_push(a, "-luser32")
+        argv_push(a, "-lwinmm")
         argv_push(a, "-Wl,/STACK:16777216")
         done = 1
     } else {

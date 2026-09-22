@@ -1,0 +1,12 @@
+fn main() {
+    println("opening canvas")
+    canvas(240, 160, "BURAAQ GFX")
+    ink(20, 80, 160)
+    wipe()
+    ink(240, 200, 60)
+    box(20, 20, 80, 40)
+    flip()
+    println("canvas is up — closing in a moment")
+    wait(1500)
+    hush()
+}

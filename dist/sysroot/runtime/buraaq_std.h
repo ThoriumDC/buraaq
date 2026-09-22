@@ -110,7 +110,7 @@ int32_t buraaq_hold_from_csv(const char *path);
 int32_t buraaq_hold_to_csv(int32_t id, const char *path);
 char *buraaq_hold_view(int32_t id);
 
-/* --- stream (websockets) --- */
+/* --- stream (websockets + binary clip/shot) --- */
 int32_t buraaq_stream_bind(int32_t port);
 int32_t buraaq_stream_hail(void);
 int32_t buraaq_stream_wire(const char *url);
@@ -118,6 +118,23 @@ int32_t buraaq_stream_say(int32_t id, const char *msg);
 char *buraaq_stream_hear(int32_t id);
 void buraaq_stream_hangup(int32_t id);
 void buraaq_stream_run(void);
+int32_t buraaq_stream_clip(int32_t id, const char *path);
+int32_t buraaq_stream_shot(int32_t id, const char *path);
+char *buraaq_stream_heard(void);
+
+/* --- gfx (game canvas + sound) --- */
+int32_t buraaq_gfx_canvas(int32_t w, int32_t h, const char *title);
+void buraaq_gfx_ink(int32_t r, int32_t g, int32_t b);
+void buraaq_gfx_wipe(void);
+void buraaq_gfx_plot(int32_t x, int32_t y);
+void buraaq_gfx_box(int32_t x, int32_t y, int32_t w, int32_t h);
+void buraaq_gfx_dash(int32_t x0, int32_t y0, int32_t x1, int32_t y1);
+void buraaq_gfx_flip(void);
+int32_t buraaq_gfx_held(const char *name);
+int32_t buraaq_gfx_pulse(void);
+void buraaq_gfx_play(const char *path);
+void buraaq_gfx_tone(int32_t hz, int32_t ms);
+void buraaq_gfx_hush(void);
 
 /* --- time --- */
 int64_t buraaq_time_now_ms(void);

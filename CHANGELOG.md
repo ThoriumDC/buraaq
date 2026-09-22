@@ -12,7 +12,10 @@ Public language 1.0. Site: [buraaq.dev](https://buraaq.dev). Engineering ledger:
 
 - Self-hosted compiler frontend in Buraaq: lexer, parser, names, MIR, LLVM text (M3–M10). Guest LLVM compiles `lexer.bq` / `parser.bq`.
 - Install prefers `dist/buraaq` + LLVM sidecar (`buraaq doctor`). Cargo is optional for *using* the language.
-- `std.stream` — live frames (WebSocket job): `stream`, `wire`, `say`, `hear`
+- `std.stream` — live frames (WebSocket job): `stream`, `wire`, `say`, `hear`, plus `clip` / `shot` / `heard` for audio and video files
+- `std.gfx` — game canvas and sound: `canvas`, `ink`, `wipe`, `plot`, `box`, `dash`, `flip`, `held`, `pulse`, `play`, `tone`, `hush`
+- Games: `stdlib/examples/nova.bq` (neon arena shooter), `gfx.bq`, `snake.bq`; Stream A/V smoke `stream_av.bq`
+- Guest `build_auto` links `buraaq_stream.c` and `buraaq_gfx.c` (`-lgdi32 -luser32 -lwinmm` on Windows)
 - `std.hold` — named columns (Pandas job): `hold`, `stow`, `pick`, `keep`
 - `std.grid` — numeric arrays (NumPy job): `zeros`, `dot`, `matmul`
 - Expanded `std.math` scalars

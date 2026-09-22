@@ -12,7 +12,8 @@ The first Buraaq standard library — small surface area, **one obvious way** fo
 | `src/math.bq` | `std.math` | scalars: trig, log, pow, pi |
 | `src/grid.bq` | `std.grid` | numeric arrays (NumPy-shaped) |
 | `src/hold.bq` | `std.hold` | named columns (Pandas-shaped) |
-| `src/stream.bq` | `std.stream` | live frames (WebSockets) |
+| `src/stream.bq` | `std.stream` | live frames (WebSockets) plus clip/shot files |
+| `src/gfx.bq` | `std.gfx` | game canvas, keys, play/tone |
 | `src/time.bq` | `std.time` | Clocks and sleep |
 | `src/collections/` | `std.collections.*` | Guest lists/maps are `[…]` / `{ "k": v }` (runtime vec/map); these modules are thin |
 | `src/net.bq` | `std.net` | TCP / UDP |
@@ -31,18 +32,23 @@ The first Buraaq standard library — small surface area, **one obvious way** fo
 | `src/led.bq` | `std.led` | Board / host LED (`on` / `off` / `wait` / `blink`) |
 | `src/ai.bq` | `std.ai` | Mind: `model` / `chat` / `embed` via AI serve |
 | `runtime/buraaq_std.c` | — | Native runtime (no GC) |
+| `runtime/buraaq_stream.c` | — | Stream text + clip/shot frames |
+| `runtime/buraaq_gfx.c` | — | Game canvas, window, play/tone |
 | `runtime/buraaq_board.c` | — | Host stub for `std.led` |
+| `examples/nova.bq` | — | NOVA neon shooter (`buraaq build` → a window titled NOVA) |
+| `examples/gfx.bq` | — | One-frame canvas smoke |
+| `examples/stream_av.bq` | — | `clip` / `shot` / `heard` without a peer |
 
 ## Tests & benchmarks
 
 C runtime unit tests link the whole runtime, because `buraaq_std.c` calls into
-the grid, hold, stream, and server translation units.
+the grid, hold, stream, gfx, and server translation units.
 
 ```powershell
 # Windows
 $rts = (Get-ChildItem runtime\*.c | Where-Object { $_.Name -ne "buraaq_runtime.c" }).FullName
 clang -I runtime tests\support\test_runtime.c @rts -o test_runtime.exe `
-  -D_CRT_SECURE_NO_WARNINGS -lwininet -ladvapi32 -lws2_32 -lgdi32 -luser32 -lcomctl32 -lshell32 -lole32 -loleaut32
+  -D_CRT_SECURE_NO_WARNINGS -lwininet -ladvapi32 -lws2_32 -lgdi32 -luser32 -lwinmm -lcomctl32 -lshell32 -lole32 -loleaut32
 .\test_runtime.exe
 ```
 

@@ -1,11 +1,12 @@
-# The Buraaq stack — Keel, Stream, Hold, Grid, Ship, Land, Mind, Strata
+# The Buraaq stack — Keel, Stream, Gfx, Hold, Grid, Ship, Land, Mind, Strata
 
 Buraaq 1.0. Ten names when you count Strata under Mind. One path from source to any host. **Lumen** is optional (native window) — not the default.
 
 | Name | What it is | You type |
 |------|------------|----------|
 | **Keel** | APIs + TLS pages. The hull of the app. | `page`, `api`, `run` |
-| **Stream** | Live frames (the WebSocket job). | `stream`, `wire`, `say`, `hear` |
+| **Stream** | Live frames, plus clip/shot files (the WebSocket job). | `stream`, `wire`, `say`, `hear`, `clip`, `shot` |
+| **Gfx** | Game canvas and sound. Not Lumen. | `canvas`, `ink`, `flip`, `held`, `play` |
 | **Hold** | Named columns (the Pandas job). | `hold`, `stow`, `pick` |
 | **Grid** | Numeric arrays (the NumPy job). | `zeros`, `dot`, `matmul` |
 | **Ship** | Hashed native bundle (`.bur`). Not a VM. | `buraaq pack` / `buraaq ship` |
@@ -51,7 +52,7 @@ buraaq ship HOST
 
 `--cloud` is `aws`, `azure`, `gcp`, `hetzner`, or `bare`. It only changes the firewall reminder. Land writes `target/land/land.sh` and a systemd unit. Pack the `.bur` **on the same OS as the host** (a Windows ship will not run on Linux).
 
-Contract for Keel: [SERVICE.md](SERVICE.md). Lumen: [LUMEN.md](LUMEN.md). Ship/Dock: [SHIP.md](SHIP.md). Mind: [AI.md](AI.md). Strata: [STRATA.md](STRATA.md). Walkthrough: [CRUD_API.md](CRUD_API.md).
+Contract for Keel: [SERVICE.md](SERVICE.md). Gfx: [GFX.md](GFX.md). Lumen: [LUMEN.md](LUMEN.md). Ship/Dock: [SHIP.md](SHIP.md). Mind: [AI.md](AI.md). Strata: [STRATA.md](STRATA.md). Walkthrough: [CRUD_API.md](CRUD_API.md).
 
 ## What this is not
 

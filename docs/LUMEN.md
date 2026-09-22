@@ -1,6 +1,8 @@
 # std.lumen — native HD UI
 
-**Lumen** is the one obvious way to draw a Buraaq desktop window. Not HTML, not Electron, not a guest OS. A native window, DPI-aware, ClearType text, talking to a **Keel** API when you want data.
+**Lumen** is the one obvious way to draw a Buraaq **operator console**. Not HTML, not Electron, not a guest OS. A native window, DPI-aware, ClearType text, talking to a **Keel** API when you want data.
+
+Pixels, a game loop, and keys are **[Gfx](GFX.md)** (`canvas` / `flip` / `held`). Lumen is forms. Gfx is the game surface.
 
 ```buraaq
 use std.lumen.{app, heading, note, field, button, bind, show}

@@ -10,7 +10,7 @@ Buraaq follows **Semantic Versioning 2.0.0**:
 | `1.0.0` | First stable language + ABI snapshot |
 | `1.x.y` | Compatible within major; patch = bugfix only |
 
-**1.0 (public):** the day-to-day native subset — syntax below, Keel/Ship/Dock/Land, Stream/Hold/Grid, and Gate B loops — is the language you install from [buraaq.dev](https://buraaq.dev). Remaining hardening (7-day fuzz clock) does not un-ship that surface. The product compiler is self-hosted (M26). Optional `buraaq` / `-e` / `script` compile snippets with clang. See [STATUS.md](STATUS.md).
+**1.0 (public):** the day-to-day native subset — syntax below, Keel/Ship/Dock/Land, Stream/Gfx/Hold/Grid, and Gate B loops — is the language you install from [buraaq.dev](https://buraaq.dev). Remaining hardening (7-day fuzz clock) does not un-ship that surface. The product compiler is self-hosted (M26). Optional `buraaq` / `-e` / `script` compile snippets with clang. See [STATUS.md](STATUS.md).
 
 ## Buraaq 1.0 syntax guarantee
 

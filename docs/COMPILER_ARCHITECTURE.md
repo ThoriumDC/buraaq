@@ -299,7 +299,8 @@ Dead code elimination strips unused runtime modules.
 math, os, time, process) are the base and always link. The rest are feature
 runtimes: UI (`buraaq_lumen.c`), server and Postgres (`buraaq_server.c`),
 threads and channels (`buraaq_runtime.c`), matrices (`buraaq_grid.c`),
-dataframes (`buraaq_hold.c`), sockets (`buraaq_stream.c`), boards
+dataframes (`buraaq_hold.c`), sockets (`buraaq_stream.c`), game canvas
+(`buraaq_gfx.c` — `canvas` / `flip` / `held`), boards
 (`buraaq_board.c`), flowdesk, and the AI client.
 
 `runtime_paths_for` in `driver/src/compile.rs` picks a feature runtime only when

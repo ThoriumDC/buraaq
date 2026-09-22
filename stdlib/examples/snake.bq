@@ -1,0 +1,215 @@
+# Old-school Snake. Arrows or WASD, space to restart, escape to quit.
+fn paint(x: int, y: int) {
+    box(x * 16 + 1, y * 16 + 33, 14, 14)
+}
+
+fn main() {
+    println("SNAKE — a window named SNAKE should open")
+    println("arrows or WASD to move, space to restart, escape to quit")
+    canvas(400, 320, "SNAKE")
+    mut bx = [10, 11, 12]
+    mut by = [9, 9, 9]
+    mut start = 0
+    mut dx = 1
+    mut dy = 0
+    mut fx = 18
+    mut fy = 9
+    mut seed = 17
+    mut score = 0
+    mut dead = 0
+
+    while held("escape") == 0 {
+        mut ndx = dx
+        mut ndy = dy
+        if held("left") {
+            if dx == 0 {
+                ndx = 0 - 1
+                ndy = 0
+            }
+        }
+        if held("a") {
+            if dx == 0 {
+                ndx = 0 - 1
+                ndy = 0
+            }
+        }
+        if held("right") {
+            if dx == 0 {
+                ndx = 1
+                ndy = 0
+            }
+        }
+        if held("d") {
+            if dx == 0 {
+                ndx = 1
+                ndy = 0
+            }
+        }
+        if held("up") {
+            if dy == 0 {
+                ndx = 0
+                ndy = 0 - 1
+            }
+        }
+        if held("w") {
+            if dy == 0 {
+                ndx = 0
+                ndy = 0 - 1
+            }
+        }
+        if held("down") {
+            if dy == 0 {
+                ndx = 0
+                ndy = 1
+            }
+        }
+        if held("s") {
+            if dy == 0 {
+                ndx = 0
+                ndy = 1
+            }
+        }
+        dx = ndx
+        dy = ndy
+
+        if dead == 1 {
+            if held("space") {
+                bx = [10, 11, 12]
+                by = [9, 9, 9]
+                start = 0
+                dx = 1
+                dy = 0
+                fx = 18
+                fy = 9
+                score = 0
+                dead = 0
+            }
+        } else {
+            n = bx.len()
+            hx = bx[n - 1]
+            hy = by[n - 1]
+            nx = hx + dx
+            ny = hy + dy
+            if nx < 0 {
+                nx = 24
+            }
+            if nx > 24 {
+                nx = 0
+            }
+            if ny < 0 {
+                ny = 17
+            }
+            if ny > 17 {
+                ny = 0
+            }
+
+            mut hit = 0
+            i = start
+            while i < n {
+                if bx[i] == nx {
+                    if by[i] == ny {
+                        hit = 1
+                    }
+                }
+                i = i + 1
+            }
+            if hit == 1 {
+                dead = 1
+                tone(180, 160)
+            } else {
+                mut ate = 0
+                if nx == fx {
+                    if ny == fy {
+                        ate = 1
+                    }
+                }
+                bx.push(nx)
+                by.push(ny)
+                if ate == 1 {
+                    score = score + 1
+                    tone(880, 40)
+                    mut placed = 0
+                    mut tries = 0
+                    while placed == 0 {
+                        tries = tries + 1
+                        seed = seed * 1103515245 + 12345
+                        mut sx = seed
+                        if sx < 0 {
+                            sx = 0 - sx
+                        }
+                        fx = sx % 25
+                        seed = seed * 1103515245 + 12345
+                        mut sy = seed
+                        if sy < 0 {
+                            sy = 0 - sy
+                        }
+                        fy = sy % 18
+                        mut on = 0
+                        k = start
+                        while k < bx.len() {
+                            if bx[k] == fx {
+                                if by[k] == fy {
+                                    on = 1
+                                }
+                            }
+                            k = k + 1
+                        }
+                        if on == 0 {
+                            placed = 1
+                        }
+                        if tries > 80 {
+                            placed = 1
+                        }
+                    }
+                } else {
+                    start = start + 1
+                }
+            }
+        }
+
+        ink(8, 12, 20)
+        wipe()
+        ink(16, 22, 36)
+        box(0, 0, 400, 32)
+        ink(240, 200, 60)
+        mut p = 0
+        while p < score {
+            if p < 36 {
+                box(8 + p * 10, 10, 8, 12)
+            }
+            p = p + 1
+        }
+        ink(36, 52, 72)
+        box(0, 32, 400, 2)
+        box(0, 318, 400, 2)
+        box(0, 32, 2, 288)
+        box(398, 32, 2, 288)
+
+        ink(40, 180, 80)
+        i = start
+        while i < bx.len() {
+            paint(bx[i], by[i])
+            i = i + 1
+        }
+        if bx.len() > start {
+            ink(200, 255, 140)
+            paint(bx[bx.len() - 1], by[by.len() - 1])
+        }
+        ink(220, 70, 50)
+        paint(fx, fy)
+
+        if dead == 1 {
+            ink(200, 50, 50)
+            dash(48, 64, 352, 288)
+            dash(352, 64, 48, 288)
+        }
+
+        flip()
+        mut delay = 110 - score * 4
+        if delay < 50 {
+            delay = 50
+        }
+        wait(delay)
+    }
+    hush()
+}

@@ -45,3 +45,5 @@ fn main() {
 | `buraaq run` | Native AOT binary (product path) |
 
 Clang is required for `run` / `build` / the shell / `-e` / `script`.
+
+Games open a **desktop window** (`canvas`). Build then run the exe so you can click that window: `buraaq build stdlib/examples/nova.bq dist/nova.exe`. [GFX.md](GFX.md).

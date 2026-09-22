@@ -1,4 +1,12 @@
 # Example: std.stream — live frames (WebSockets) without the word websocket
+#
+# A client can also send audio/video files:
+#   s = wire("ws://127.0.0.1:9420/")
+#   say(s, "hello")
+#   clip(s, "step.wav")
+#   shot(s, "frame.png")
+#   msg = hear(s)
+#   kind = heard()
 fn main() {
     stream(9420)
     run_stream()

@@ -67,7 +67,8 @@ To prove a clone: `powershell -File scripts/selfhost-test.ps1` then `powershell 
 |----------|---------|-----|
 | `.bq` | Native binary via LLVM | A VM, a GIL, a collector |
 | `page` / `api` / `run` | TLS APIs and pages (**Keel**) | Express + a reverse-proxy homework |
-| `stream` / `wire` / `say` | Live frames (**Stream**) | WebSockets-as-a-library |
+| `stream` / `wire` / `say` / `clip` / `shot` | Live frames (**Stream**) | WebSockets-as-a-library |
+| `canvas` / `ink` / `flip` / `held` | Game pixels and sound (**Gfx**) | An engine you rent |
 | `hold` / `stow` / `pick` | Named columns (**Hold**) | Pandas |
 | `zeros` / `dot` / `matmul` | Numeric arrays (**Grid**) | NumPy |
 | `buraaq pack` / `ship` / `land` | Hashed `.bur` on any host | A guest Linux inside Linux |
@@ -117,7 +118,8 @@ Secrets stay in host env. Never in git. Test only machines you own or are author
 | [buraaq.dev](https://buraaq.dev) | Public docs: install → ledger CLI → modules → live API → ship |
 | [Syntax](docs/SYNTAX_REFERENCE.md) | The language |
 | [Scripting](docs/SCRIPTING.md) | `buraaq` / `-e` / `script` |
-| [The stack](docs/STACK.md) | Keel, Stream, Hold, Grid, Ship, Dock, Land, Mind, Strata |
+| [The stack](docs/STACK.md) | Keel, Stream, Gfx, Hold, Grid, Ship, Dock, Land, Mind, Strata |
+| [Gfx](docs/GFX.md) | Game canvas, keys, play/tone; run `stdlib/examples/nova.bq` |
 | [Buraaq AI](docs/AI.md) | `buraaq ai` serve / chat / planner |
 | [Status](docs/STATUS.md) | What 1.0 measured, what still hardens |
 | [Performance](docs/PERFORMANCE.md) | Gate B vs C++ |

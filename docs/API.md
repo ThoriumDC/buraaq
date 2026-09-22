@@ -38,7 +38,8 @@ Install: `install.ps1` / `install.sh`.
 | `std.math` | `abs_int`, `sqrt`, `min`, `max`, `sin`/`cos`/`tan`, `exp`/`log`/`pow`, `pi`, `clamp`, `lerp` |
 | `std.grid` | `zeros`, `ones`, `eye`, `row`, `at`, `put_at`, `dot`, `matmul`, `sum`, `mean` — numeric arrays |
 | `std.hold` | `hold`, `stow`, `pick`, `keep`, `from_csv`, `col_mean` — named columns |
-| `std.stream` | `stream`, `wire`, `say`, `hear`, `hangup`, `run_stream` — live frames (WebSockets) |
+| `std.stream` | `stream`, `wire`, `say`, `hear`, `hangup`, `run_stream`, `clip`, `shot`, `heard` — live frames (text + audio/video) |
+| `std.gfx` | `canvas`, `ink`, `wipe`, `plot`, `box`, `dash`, `flip`, `held`, `pulse`, `play`, `tone`, `hush` — game canvas + sound |
 | `std.time` | `now_ms`, `now_sec`, `sleep`, `ms`, `sec` |
 | `std.os` | `getenv`, `args`, `arg` |
 | `std.keel` | `page`, `api`, `store`, `key`, `origin`, `call`, `run` — TLS APIs. `std.service` is the old name. [STACK.md](STACK.md) |

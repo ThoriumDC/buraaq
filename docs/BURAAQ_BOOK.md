@@ -99,6 +99,8 @@ fn main() {
 
 See [STACK.md](STACK.md) for Keel → Ship → Dock → Land (AWS, Azure, GCP, Hetzner, bare metal).
 
+Live frames are **Stream** (`say` / `hear`, plus `clip` / `shot` for files). Pixels and keys are **Gfx** (`canvas` / `flip` / `held`) — not Lumen. Run `stdlib/examples/nova.bq`. [GFX.md](GFX.md).
+
 ## Part IX — Stability and 1.0
 
 Pre-1.0: expect evolution. At 1.0: syntax + ownership rules frozen per [STABILITY.md](STABILITY.md).

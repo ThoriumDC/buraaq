@@ -1,0 +1,14 @@
+# Example: std.gfx — canvas, ink, and a one-frame game loop
+fn main() {
+    canvas(80, 48, "dot")
+    ink(12, 18, 32)
+    wipe()
+    ink(40, 200, 90)
+    box(12, 10, 20, 14)
+    plot(40, 24)
+    dash(0, 0, 79, 47)
+    flip()
+    println(pulse())
+    println(held("escape"))
+    hush()
+}

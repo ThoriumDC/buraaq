@@ -13,7 +13,7 @@ Do not print `BURAAQ 1.0 RELEASE GATES: PASS` until A–J all pass, including a 
 
 - Native multi-module programs, typed `print`/`println`, project auto-import of unique `std.*`
 - Growable lists `[1, 2]` / `["a"]`, maps `{ "k": v }`, `raise` / `?` / `??`
-- **Stream** (`std.stream`), **Hold** (`std.hold`), **Grid** (`std.grid`), expanded `std.math`
+- **Stream** (`std.stream` text + `clip`/`shot`), **Gfx** (`std.gfx` canvas/sound; play `stdlib/examples/nova.bq`), **Hold** (`std.hold`), **Grid** (`std.grid`), expanded `std.math`
 - Keel TLS APIs + Postgres (including Neon `sslmode=require`)
 - Ship `.bur` / Dock `:7422` / Land kits (`aws`, `azure`, `gcp`, `hetzner`, `bare`)
 - Compiler frontend in Buraaq: lexer, parser, names, MIR, LLVM text (M3–M10)

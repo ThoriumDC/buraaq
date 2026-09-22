@@ -5,7 +5,10 @@
 #
 # s = wire("ws://127.0.0.1:9420/")
 # say(s, "hello")
-# println(hear(s))
+# clip(s, "step.wav")
+# shot(s, "frame.png")
+# msg = hear(s)
+# kind = heard()
 module std.stream
 
 extern c {
@@ -16,6 +19,9 @@ extern c {
     fn buraaq_stream_hear(id: c.int) -> c.text
     fn buraaq_stream_hangup(id: c.int) -> void
     fn buraaq_stream_run() -> void
+    fn buraaq_stream_clip(id: c.int, path: c.text) -> c.int
+    fn buraaq_stream_shot(id: c.int, path: c.text) -> c.int
+    fn buraaq_stream_heard() -> c.text
 }
 
 pub fn stream(port: int) {
@@ -44,4 +50,16 @@ pub fn hangup(id: int) {
 
 pub fn run_stream() {
     unsafe { buraaq_stream_run() }
+}
+
+pub fn clip(id: int, path: text) -> int {
+    unsafe { buraaq_stream_clip(id, path.to_c()) }
+}
+
+pub fn shot(id: int, path: text) -> int {
+    unsafe { buraaq_stream_shot(id, path.to_c()) }
+}
+
+pub fn heard() -> text {
+    unsafe { buraaq_stream_heard() }
 }

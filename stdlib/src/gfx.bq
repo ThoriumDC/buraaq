@@ -1,0 +1,75 @@
+# std.gfx — a canvas, ink, and sound (the Buraaq game loop)
+#
+# canvas(320, 180, "dot")
+# ink(40, 200, 90)
+# wipe()
+# box(20, 40, 24, 24)
+# flip()
+# if held("right") { ... }
+# play("step.wav")
+# tone(440, 80)
+# hush()
+module std.gfx
+
+extern c {
+    fn buraaq_gfx_canvas(w: c.int, h: c.int, title: c.text) -> c.int
+    fn buraaq_gfx_ink(r: c.int, g: c.int, b: c.int) -> void
+    fn buraaq_gfx_wipe() -> void
+    fn buraaq_gfx_plot(x: c.int, y: c.int) -> void
+    fn buraaq_gfx_box(x: c.int, y: c.int, w: c.int, h: c.int) -> void
+    fn buraaq_gfx_dash(x0: c.int, y0: c.int, x1: c.int, y1: c.int) -> void
+    fn buraaq_gfx_flip() -> void
+    fn buraaq_gfx_held(name: c.text) -> c.int
+    fn buraaq_gfx_pulse() -> c.int
+    fn buraaq_gfx_play(path: c.text) -> void
+    fn buraaq_gfx_tone(hz: c.int, ms: c.int) -> void
+    fn buraaq_gfx_hush() -> void
+}
+
+pub fn canvas(w: int, h: int, title: text) {
+    unsafe { buraaq_gfx_canvas(w, h, title.to_c()) }
+}
+
+pub fn ink(r: int, g: int, b: int) {
+    unsafe { buraaq_gfx_ink(r, g, b) }
+}
+
+pub fn wipe() {
+    unsafe { buraaq_gfx_wipe() }
+}
+
+pub fn plot(x: int, y: int) {
+    unsafe { buraaq_gfx_plot(x, y) }
+}
+
+pub fn box(x: int, y: int, w: int, h: int) {
+    unsafe { buraaq_gfx_box(x, y, w, h) }
+}
+
+pub fn dash(x0: int, y0: int, x1: int, y1: int) {
+    unsafe { buraaq_gfx_dash(x0, y0, x1, y1) }
+}
+
+pub fn flip() {
+    unsafe { buraaq_gfx_flip() }
+}
+
+pub fn held(name: text) -> int {
+    unsafe { buraaq_gfx_held(name.to_c()) }
+}
+
+pub fn pulse() -> int {
+    unsafe { buraaq_gfx_pulse() }
+}
+
+pub fn play(path: text) {
+    unsafe { buraaq_gfx_play(path.to_c()) }
+}
+
+pub fn tone(hz: int, ms: int) {
+    unsafe { buraaq_gfx_tone(hz, ms) }
+}
+
+pub fn hush() {
+    unsafe { buraaq_gfx_hush() }
+}
