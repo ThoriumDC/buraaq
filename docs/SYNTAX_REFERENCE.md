@@ -13,7 +13,7 @@ Buraaq reads like pseudocode. There is **one way** to do each basic thing.
 |------|---------|
 | One binding syntax | `name = expr` or `mut name = expr` |
 | One block syntax | `{ ... }` |
-| One import syntax | `use path.item` |
+| One import syntax | `use io` / `use path.item` (no `std.` required) |
 | One error propagate | `expr?` |
 | One optional type | `Option[T]` / `none` / `some(x)` |
 | One unsafe gate | `unsafe { ... }` |
@@ -87,7 +87,7 @@ true  false
 
 #### String interpolation
 
-Only `$` + `{expr}` form (no `%s` printf style):
+`{name}` inside `"..."` substitutes the local (text, int, or bool). No `$`, no `%s`. A literal `$` is just a character: `"${name}"` prints `$Asim`.
 
 ```buraaq
 name = "Asim"
@@ -95,22 +95,22 @@ age = 30
 msg = "Hello, {name}! You are {age} years old."
 ```
 
-Expression in `{ }` must implement `ToText` or be a primitive the compiler knows how to format.
-
 #### Bytes
 
 ```
 b"raw\x00bytes"
 ```
 
-#### Option / Result literals
+#### Empty / wrap literals
 
 ```buraaq
-none
-some(42)
-ok(value)
-err(IOError.NotFound("config.toml"))
+none            # empty text (null); `none ?? "x"` is `"x"`
+some(42)        # identity wrap of the inner value
+ok(value)       # identity wrap
+err(1)          # identity wrap — not a tagged error
 ```
+
+App errors use `raise` / `?` / `??` (see 5.2). Do not `match Ok` / `Err` — those arms do not bind a tag in the guest.
 
 ---
 
@@ -142,15 +142,20 @@ char
 ### 3.3 Composite
 
 ```buraaq
+[1, 2, 3]          # growable int list
+["a", "b"]         # growable text list
+{ "k": 1 }         # map, text keys, int or text values
 (T1, T2)           # tuple
-[T; N]             # fixed array (N compile-time constant)
+[T; N]             # fixed array (FFI / systems)
 T[]                # slice (borrowed view)
-List[T] Map[K,V]   # std collections
-Option[T] Result[T,E]
 fn(A, B) -> C      # function pointer type
 ```
 
 Generics use square brackets: `Box[T]`, not angle brackets.
+
+A list literal is `[...]`. Integers and text both work: `nums = [10, 20]`, `names = ["a", "b"]`. Index with `xs[i]`, grow with `xs.push(v)`, walk with `for x in xs`.
+
+A map literal is `{ "key": value }`. Keys are text. Values are int or text. Read and write with `m["key"]`.
 
 ### 3.4 Type annotations
 
@@ -212,24 +217,22 @@ fn add(a: int, b: int) -> int {
 
 ### 5.2 Fallible functions
 
-**One** error declaration style—`throws`:
+`raise` writes the message to stderr and returns empty (null text / `0`).  
+`?` forwards that empty value. `??` supplies a default. `throws` in a signature is accepted and skipped; the return type is still `-> T`.
 
 ```buraaq
-fn read_config(path: text) throws IOError -> Config {
-    data = read_file(path)?
-    parse_config(data)
+fn load(path: text) -> text {
+    if exists(path) == 0 {
+        raise "missing"
+    }
+    read(path)
 }
+
+text = load("app.cfg") ?? "default"
+data = load("app.cfg")?
 ```
 
-Desugars to `-> Result[Config, IOError]`. Use `raise expr` for early error return inside `throws` functions.
-
-Alternative (equivalent, more verbose):
-
-```buraaq
-fn read_config(path: text) -> Result[Config, IOError] { ... }
-```
-
-Do not mix styles in the same codebase; `throws` is preferred for application code.
+`0` is empty for ints — do not `?` a value where zero is success. `ok` / `err` / `some` copy the inner value; they do not tag a `Result`.
 
 ### 5.3 Methods
 
@@ -253,11 +256,11 @@ struct Point {
 ### 5.4 Generics
 
 ```buraaq
-fn first[T](items: List[T]) -> Option[T] {
-    if items.is_empty() {
+fn first(items: text) -> text {
+    if len(items) == 0 {
         return none
     }
-    some(items[0])
+    items
 }
 ```
 
@@ -296,6 +299,18 @@ fn double(n: int) -> int {
     n * 2
 }
 ```
+
+### 6.4 Console I/O
+
+`print` writes values with no trailing newline. `println` writes the same, then a newline. Both take text, int, float, and bool. Extra arguments are space-joined.
+
+```buraaq
+print("count ")
+println(3)
+println("ok", true, 1.5)
+```
+
+`print_int` / `print_float` / `print_bool` still work. They are just `println` for that type.
 
 ---
 
@@ -339,17 +354,26 @@ No implicit truthiness: only `bool` allowed in conditions.
 
 ### 7.4 Error propagation
 
-```buraaq
-data = read_file(path)?
-```
-
-Postfix `?` only—no `try/catch`, no exceptions.
-
-### 7.5 Force unwrap (discouraged)
+`raise` writes the message to stderr and returns empty (null text / 0).  
+`?` forwards that empty value to the caller. `??` supplies a default.
 
 ```buraaq
-value = opt!    # panics if none/err — lint warns outside tests
+fn load(path: text) -> text {
+    if exists(path) == 0 {
+        raise "missing"
+    }
+    read(path)
+}
+
+text = load("app.cfg") ?? "default"
+data = load("app.cfg")?
 ```
+
+`0` is empty for ints, so do not `?` a value where zero is success. No `try/catch`.
+
+### 7.5 Prefix `!`
+
+`!` is boolean not (`xor` with 1). It is not force-unwrap.
 
 ### 7.6 Null-coalescing
 
@@ -415,12 +439,19 @@ parallel for item in items {
 
 ### 8.4 Match
 
-Justified for enums and tagged unions—one pattern form:
+Justified for enums — `Enum.Variant` or `_`. `Ok(v)` / `Err(e)` is not tagged in the guest.
 
 ```buraaq
-match result {
-    Ok(v) => print(v),
-    Err(e) => print(e.message()),
+enum Color {
+    Red,
+    Blue,
+}
+
+c = Color.Blue
+match c {
+    Color.Red => println("red"),
+    Color.Blue => println("blue"),
+    _ => println("other"),
 }
 ```
 
@@ -515,10 +546,13 @@ File `src/http/server.bq` → module `http.server`.
 ```buraaq
 module http.server   # optional if matches path
 
-use std.io.println
-use std.collections.{List, Map}
-use std.net as net
+println("hi")           # unique std.io name: no use
+use io                  # std.io; or use std.io
+use keel.{page, api, run}
+use tx.signed           # your module
 ```
+
+`connect`, `show`, and `keep` are not unique. Write `use db` or `use net` (and the same for lumen/flowdesk, hold/lumen).
 
 Visibility: `pub` prefix exports item.
 
@@ -541,7 +575,7 @@ p = Point { x: 1.0, y: 2.0 }
 ### 13.2 Heap
 
 ```buraaq
-list = new List[int]()
+list = [1, 2, 3]
 ```
 
 Compiler inserts drop at scope end (see MEMORY_MODEL.md).

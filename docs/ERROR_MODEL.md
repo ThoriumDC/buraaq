@@ -2,6 +2,8 @@
 
 Buraaq treats recoverable failures as **values**, not control-flow exceptions. Unrecoverable programmer bugs use **panics**. This document defines error types, propagation, conversion, and interaction with I/O and concurrency.
 
+**Guest today (`dist/buraaq`):** `raise e` writes `e` to stderr and returns empty (null text / `0`). `expr?` returns empty if the value is empty. `a ?? b` uses `b` when `a` is 0 or null. `throws` in a signature is skipped. `ok` / `err` / `some` copy the inner value. `match Ok` / `Err` does not tag. `match Color.Red` on a declared enum works. See [SYNTAX_REFERENCE.md](SYNTAX_REFERENCE.md) §5.2. Sections below that mention tagged `Result` / `Ok` / `Err` are the target model, not what the guest emits.
+
 ---
 
 ## 1. Design Principles

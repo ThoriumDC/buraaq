@@ -2,6 +2,8 @@
 
 Buraaq provides **Rust-grade memory safety without lifetime syntax**. Safety is enforced through a layered compile-time analysis pipeline that combines ownership tracking, region-based borrow checking, and Guarded Flow Analysis (GFA) on MIR.
 
+**Guest today:** do not write `give x = …` — `give` is reserved and is loaded as a variable. Ordinary `x = …` is the binding.
+
 ---
 
 ## 1. Guiding Principle

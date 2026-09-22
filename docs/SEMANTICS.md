@@ -2,6 +2,8 @@
 
 This document defines the **meaning** of Buraaq programs. Syntax is in [`SYNTAX_REFERENCE.md`](./SYNTAX_REFERENCE.md); formal grammar in [`grammar/buraaq.ebnf`](../grammar/buraaq.ebnf).
 
+**Guest today:** errors are empty values (`raise` / `?` / `??`), lists are `[…]`, maps are `{ "k": v }`, interpolation is `"Hello, {name}"`. Tagged `Result` / `give` / `let` below are the target model.
+
 Buraaq semantics prioritize: **safe defaults**, **inference when sound**, **explicit diagnostics when ambiguous**.
 
 ---
@@ -11,7 +13,7 @@ Buraaq semantics prioritize: **safe defaults**, **inference when sound**, **expl
 1. **Single owner** for non-`copy` values unless borrowed.
 2. **No null in safe code** — absence is `none`.
 3. **No implicit narrowing** — `int` to `byte` requires explicit cast.
-4. **No exceptions** — errors are `Result` values; panics are bugs.
+4. **No exceptions** — guest: `raise` / `?` / `??`. Target: `Result` values. Panics are bugs.
 5. **Deterministic drop** — resources release at scope exit, `defer`, or move.
 6. **Thread safety inferred** — `Send`/`Sync` not written by users.
 7. **Ambiguity is an error** — compiler never silently picks a type.

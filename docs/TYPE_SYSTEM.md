@@ -2,6 +2,8 @@
 
 Buraaq uses **static structural typing** with **nominal records** (structs/enums), **parametric polymorphism**, and **trait-based constraints**. Type inference handles most local bindings; function signatures anchor polymorphism.
 
+**Guest today:** locals are inferred as int / text / float / bool / list / map from assignment. `List[T]` and `Map[K,V]` in this document are the target names; write `[1, 2]` and `{ "k": 1 }`. See [SYNTAX_REFERENCE.md](SYNTAX_REFERENCE.md).
+
 ---
 
 ## 1. Type Categories
@@ -60,7 +62,7 @@ Buraaq uses **constraint-based local inference** (Algorithm J variant):
 | Untyped integer literal | `i32` |
 | Untyped float literal | `f64` |
 | Empty collection `[]` | Error unless expected type provided |
-| `let x = ...` | Solve from RHS |
+| `x = ...` | Solve from RHS |
 
 ### 2.3 Ambiguity resolution
 

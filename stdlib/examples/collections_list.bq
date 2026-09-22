@@ -1,6 +1,15 @@
-# Example: std.collections.list
-module example.collections_list
-
+# Example: growable lists — ints and text
 fn main() {
-    print("List[T] provides growable sequences")
+    nums = [10, 20, 30]
+    nums.push(40)
+    println(nums[0])
+    for n in nums {
+        println(n)
+    }
+    names = ["a", "b"]
+    names.push("c")
+    println(names[0])
+    for s in names {
+        println(s)
+    }
 }

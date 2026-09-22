@@ -14,33 +14,32 @@ Buraaq asks: *what if memory safety and performance were defaults, and the compi
 ## Part II — First program
 
 ```buraaq
-use std.io.println
-
 fn main() {
     println("Hello, Buraaq!")
 }
 ```
 
+`println` is unique in std, so there is no `use`. It takes text, int, float, or bool.
+
 Run: `buraaq run`. No build system debates — `buraaq.pkg` + `buraaq` CLI.
 
 ## Part III — Ownership without jargon
 
-Bindings use `give`:
+Bindings are ordinary names. The guest does **not** lower `give x = …` (`give` is read as a variable). Write:
 
 ```buraaq
-give socket = connect("127.0.0.1", 8080)
-send_all(socket, payload)   # ownership may transfer
-# socket is gone here — compiler explains if you use it again
+socket = connect("127.0.0.1", 8080)
+send_all(socket, payload)
 ```
 
-Need temporary access? **Borrow:**
+Need a pointer the callee must not free? **Borrow:**
 
 ```buraaq
 send_all(ref socket, payload)
-socket.close()   # still owned here
+socket.close()
 ```
 
-The compiler shows *where* ownership moved and *what to change* — not `E0382`.
+`give` remains a reserved word for a later clarity pass. Do not start a binding with it.
 
 ## Part IV — Errors that teach
 
@@ -58,11 +57,11 @@ See `docs/errors/` for stable error catalog entries.
 Threads, async tasks, channels, and mutexes share one runtime (`stdlib/runtime/`). No three async ecosystems.
 
 ```buraaq
-give ch = channel[i32](64)
+ch = channel[i32](64)
 spawn {
     ch.send(42)
 }
-give v = ch.recv()
+v = ch.recv()
 ```
 
 ## Part VI — Tooling as a feature
@@ -72,7 +71,7 @@ The compiler is written in Buraaq. `dist/buraaq` is that compiler.
 | Tool | Command |
 |------|---------|
 | Shell | `buraaq` / `buraaq repl` |
-| One-liner | `buraaq -e "print_int(40+2)"` |
+| One-liner | `buraaq -e "println(40+2)"` |
 | File | `buraaq script FILE.bq` / `buraaq run FILE.bq` |
 | Build | `buraaq build` |
 | Test | `buraaq test` |
@@ -91,8 +90,6 @@ See [PERFORMANCE.md](PERFORMANCE.md).
 Complexity belongs in the runtime. You declare pages and APIs; `run()` binds TLS and serves.
 
 ```buraaq
-use std.keel.{page, api, run}
-
 fn main() {
     page("/", "public/index.html")
     api("items", "title, body")

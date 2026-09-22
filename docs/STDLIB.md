@@ -29,12 +29,10 @@ Console I/O.
 
 | API | Description |
 |-----|-------------|
-| `print(msg: text)` | Write text without newline |
-| `println(msg: text)` | Write text with newline |
+| `print(...)` | Write values without a newline (text, int, float, bool; space-joined) |
+| `println(...)` | Same, then a newline |
 | `eprintln(msg: text)` | Write a line to stderr |
-| `print_int(n: int)` | Print integer |
-| `print_float(n: float)` | Print float |
-| `print_bool(v: bool)` | Print bool |
+| `print_int` / `print_float` / `print_bool` | Older names for `println` of that type |
 | `read_line() -> text` | One line from stdin (EOF is `:quit`) |
 
 ### `std.fs`
@@ -158,8 +156,8 @@ Submodules (one type each):
 
 | Module | Type | Role |
 |--------|------|------|
-| `std.collections.list` | `List[T]` | Growable sequence |
-| `std.collections.map` | `Map[K,V]` | Key/value map |
+| `std.collections.list` | `[1, 2]`, `["a", "b"]` | Growable list: `xs[i]`, `xs.push(v)`, `for x in xs` |
+| `std.collections.map` | `{ "k": v }` | Text-key map: `m["k"]`, int or text values |
 | `std.collections.set` | `Set[T]` | Unique values |
 | `std.collections.buffer` | `Buffer` | Byte/text buffer |
 
@@ -473,7 +471,7 @@ Examples live in `stdlib/examples/` — one per major module group.
 |---------|--------|
 | Stdlib source modules | ✅ |
 | C runtime linked on build | ✅ |
-| `use std.*` import resolution | 🔄 in progress |
+| Unique `std.*` auto-import; `use io` / `use std.io` | ✅ |
 | User `extern c` codegen | 🔄 partial |
 | Multi-module package build | 🔄 planned |
 

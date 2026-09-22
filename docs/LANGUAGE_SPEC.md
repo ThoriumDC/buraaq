@@ -1,6 +1,6 @@
 # Buraaq Language Specification (v0.1 Draft)
 
-This document is the authoritative reference for Buraaq syntax and semantics. Implementation status is tracked in [ROADMAP.md](./ROADMAP.md).
+**What you can compile today** is [SYNTAX_REFERENCE.md](SYNTAX_REFERENCE.md) — that is the guest (`dist/buraaq`). This draft still describes a wider target (`let`, colon blocks `fn main():`, tagged `Result`, `give` as a move). Guest programs use `{ }` blocks and `name = expr`. Do not copy draft-only forms unless the syntax reference shows them. Implementation status: [ROADMAP.md](./ROADMAP.md).
 
 ---
 
@@ -76,7 +76,7 @@ Postfix `?` propagates errors. Postfix `!` unwraps `Option`/`Result` in debug co
 ```buraaq
 module myapp.main    # optional; defaults from file path
 
-use std.io.{print, println}
+println("hi")    # unique std.io name: no use
 ```
 
 Every package has exactly one entry module (`buraaq.pkg` → `entry = "main"`).
@@ -213,7 +213,7 @@ break 42    # labeled break value in for loops returning Option
 | `text` | UTF-8 string (owned, immutable) |
 | `bytes` | Byte sequence |
 | `T[]` | Slice/view (borrowed sequence) |
-| `List[T]`, `Map[K,V]` | Standard collections |
+| `[1, 2]`, `["a"]`, `{ "k": v }` | Guest lists and maps |
 | `Option[T]`, `Result[T,E]` | Standard enums |
 | `fn(A, B) -> C` | Function pointer |
 | `*T`, `*mut T` | Raw pointers (`unsafe` only) |
@@ -226,8 +226,8 @@ See [TYPE_SYSTEM.md](./TYPE_SYSTEM.md) for full rules.
 
 ```buraaq
 let p = Point { x: 1.0, y: 2.0 }     # stack struct
-let list = new List[i32]()           # heap allocation
-give list_to_fn(list)                # explicit move when compiler asks
+nums = [1, 2, 3]                     # growable list
+list_to_fn(nums)                     # `give` is reserved; do not start a binding with it
 ref r = list                         # shared borrow
 ref mut w = list                     # exclusive borrow
 ```
@@ -284,10 +284,9 @@ Safe code cannot dereference raw pointers or call `unsafe fn`.
 
 ```buraaq
 # examples/hello.bq
-use std.io.println
-
-fn main():
+fn main() {
     println("Hello, world!")
+}
 ```
 
 ### 11.2 Variables
@@ -448,7 +447,7 @@ fn main():
             println("failed: " + e.to_text())
 ```
 
-Note: `raise E` inside `throws E` function is sugar for `return Err(E)`.
+Guest: `raise e` writes `e` to stderr and returns empty. `?` forwards empty. `??` defaults. `throws` in the signature is skipped.
 
 ### 11.9 Files
 

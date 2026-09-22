@@ -1,7 +1,7 @@
 # std.service — compatibility name for std.keel (same C runtime)
 #
-# Prefer: use std.keel.{page, api, run}
-# Reference: docs/STACK.md
+# Auto-import treats these names as keel. Prefer `use keel` or no `use`.
+# `use service` still names this module. Reference: docs/STACK.md
 module std.service
 
 extern c {

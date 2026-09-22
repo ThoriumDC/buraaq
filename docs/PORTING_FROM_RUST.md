@@ -3,7 +3,7 @@
 ## Similarities
 
 - Ownership, moves, borrows (`ref` / `mut ref`)
-- `Result` / `Option`, pattern matching
+- `Option` / `none`; guest errors are `raise` / `?` / `??` (tagged `Result` is the target model)
 - No null — use `Option`
 - LLVM backend
 
@@ -11,7 +11,7 @@
 
 | Rust | Buraaq |
 |------|--------|
-| `let` | `give` |
+| `let x =` | `x =` (`give` is reserved; do not start a binding with it) |
 | `fn foo()` | `fn foo()` (same) |
 | `'a` lifetimes | mostly elided; regions internal |
 | `impl Trait` | traits + impl blocks |

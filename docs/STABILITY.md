@@ -16,11 +16,12 @@ Buraaq follows **Semantic Versioning 2.0.0**:
 
 At 1.0, the following are **frozen**:
 
-- Indentation-based block structure (4 spaces official)
-- Core keywords: `fn`, `give`, `mut`, `struct`, `enum`, `trait`, `impl`, `match`, `async`, `spawn`, …
-- Ownership + borrow rules as documented in `MEMORY_MODEL.md`
-- Module system: `module`, `use`, `buraaq.pkg`
-- Error model: `Result` / `Option`, `throws`, `raise`
+- Brace blocks `{ }` (4 spaces official inside them)
+- Core keywords: `fn`, `mut`, `struct`, `enum`, `trait`, `impl`, `match`, `async`, `spawn`, `raise`, …
+- `print` / `println`, `"Hello, {name}"`, `[1, 2]`, `["a"]`, `{ "k": v }`
+- Ownership + borrow rules as documented in `MEMORY_MODEL.md` (`give` reserved; guest bindings are `x =`)
+- Module system: `module`, `use io` / `use std.io`, unique `std.*` auto-import, `buraaq.pkg`
+- Error model: `raise` / `?` / `??` (empty values). Tagged `Result` is the target, not the guest freeze.
 
 **May still grow after 1.0:** generic constraints, JSON DOM, channels, registry fetch. Diagnostic **IDs** stay stable; wording may improve.
 

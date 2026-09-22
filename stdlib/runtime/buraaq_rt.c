@@ -372,6 +372,75 @@ void buraaq_vec_free(void *h) {
    per field, wide enough for either an i32 or a pointer. Zeroed, so a field that
    is never assigned reads as 0 or NULL rather than as garbage. Takes i32
    because that is the only integer width the bootstrap compiler can express. */
+/* Linear map: text keys, int or text values. Missing get is 0 / NULL so `??` works. */
+typedef struct {
+    int32_t len;
+    int32_t cap;
+    char **keys;
+    void **vals;
+} BqMap;
+
+void *buraaq_map_new(void) {
+    return calloc(1, sizeof(BqMap));
+}
+
+static int map_grow(BqMap *m) {
+    if (m->len < m->cap) return 0;
+    int32_t cap = m->cap ? m->cap * 2 : 8;
+    char **keys = (char **)bq_realloc(m->keys, (size_t)cap * sizeof(char *));
+    void **vals = (void **)bq_realloc(m->vals, (size_t)cap * sizeof(void *));
+    if (!keys || !vals) return -1;
+    m->keys = keys;
+    m->vals = vals;
+    m->cap = cap;
+    return 0;
+}
+
+static int32_t map_find(BqMap *m, const char *k) {
+    int32_t i;
+    if (!m || !k) return -1;
+    for (i = 0; i < m->len; i++) {
+        if (m->keys[i] && strcmp(m->keys[i], k) == 0) return i;
+    }
+    return -1;
+}
+
+static int32_t map_upsert(BqMap *m, const char *k) {
+    int32_t i = map_find(m, k);
+    if (i >= 0) return i;
+    if (!m || map_grow(m) != 0) return -1;
+    i = m->len++;
+    m->keys[i] = buraaq_dup(k);
+    m->vals[i] = NULL;
+    return i;
+}
+
+void buraaq_map_set_int(void *h, const char *k, int32_t v) {
+    BqMap *m = (BqMap *)h;
+    int32_t i = map_upsert(m, k);
+    if (i < 0) return;
+    m->vals[i] = (void *)(intptr_t)v;
+}
+
+void buraaq_map_set_text(void *h, const char *k, const char *v) {
+    BqMap *m = (BqMap *)h;
+    int32_t i = map_upsert(m, k);
+    if (i < 0) return;
+    m->vals[i] = buraaq_dup(v);
+}
+
+int32_t buraaq_map_get_int(void *h, const char *k) {
+    int32_t i = map_find((BqMap *)h, k);
+    if (i < 0) return 0;
+    return (int32_t)(intptr_t)((BqMap *)h)->vals[i];
+}
+
+char *buraaq_map_get_text(void *h, const char *k) {
+    int32_t i = map_find((BqMap *)h, k);
+    if (i < 0) return NULL;
+    return (char *)((BqMap *)h)->vals[i];
+}
+
 void *buraaq_obj_new(int32_t slots) {
     if (slots <= 0) return NULL;
     return calloc((size_t)slots, 8);

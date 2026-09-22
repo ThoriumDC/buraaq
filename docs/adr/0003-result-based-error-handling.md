@@ -1,5 +1,7 @@
 # ADR 0003: Result-Based Error Handling with `?` Propagation
 
+> **Guest today:** `raise` / `?` / `??` on empty values (null / 0). Tagged `Result` / `Ok` / `Err` match is not emitted. See [SYNTAX_REFERENCE.md](../SYNTAX_REFERENCE.md) §5.2.
+
 ## Status
 
 Accepted

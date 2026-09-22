@@ -6,7 +6,7 @@ The first Buraaq standard library — small surface area, **one obvious way** fo
 
 | Path | Module | Purpose |
 |------|--------|---------|
-| `src/io.bq` | `std.io` | Console I/O (`print`, `read_line`) |
+| `src/io.bq` | `std.io` | Console I/O (`print` / `println` / `read_line`) |
 | `src/fs.bq` | `std.fs` | Files: read / write / exists |
 | `src/text.bq` | `std.text` | String helpers |
 | `src/math.bq` | `std.math` | scalars: trig, log, pow, pi |
@@ -14,7 +14,7 @@ The first Buraaq standard library — small surface area, **one obvious way** fo
 | `src/hold.bq` | `std.hold` | named columns (Pandas-shaped) |
 | `src/stream.bq` | `std.stream` | live frames (WebSockets) |
 | `src/time.bq` | `std.time` | Clocks and sleep |
-| `src/collections/` | `std.collections.*` | List, Map, Set, Buffer |
+| `src/collections/` | `std.collections.*` | Guest lists/maps are `[…]` / `{ "k": v }` (runtime vec/map); these modules are thin |
 | `src/net.bq` | `std.net` | TCP / UDP |
 | `src/keel.bq` | `std.keel` | APIs + TLS servers (`std.service` is the old name) |
 | `src/lumen.bq` | `std.lumen` | Native HD windows |

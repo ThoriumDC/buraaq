@@ -29,7 +29,7 @@ C pointer lifetimes become compiler-checked. If C "steals" a pointer, document w
 
 ## Errors
 
-Replace `errno` / return codes with `Result` where possible.
+Replace `errno` / return codes with `raise` / `?` / `??` (empty value). Tagged `Result` is the target model.
 
 ## Performance
 

@@ -2,6 +2,8 @@
 
 Buraaq provides **memory safety by default**, **deterministic destruction**, and **no garbage collector** for normal systems programming. Safety is enforced by **Guarded Flow Analysis (GFA)** at compile time; the programmer never writes lifetime annotations.
 
+**Guest today:** `give x =` does not lower. Use `x =`. `give` stays reserved.
+
 ---
 
 ## 1. Principles
@@ -33,9 +35,8 @@ Buraaq provides **memory safety by default**, **deterministic destruction**, and
 For types not marked `copy`:
 
 ```buraaq
-let a = new List[i32]()
-let b = a        # ERROR: use of moved value `a`
-let b = give a   # OK: explicit move when required by clarity pass
+a = [1, 2, 3]
+b = a            # move (target GFA); guest still allows a second read
 ```
 
 Function arguments and return values use move semantics. The compiler elides copies when source is unused (NRVO/move elision).
@@ -138,7 +139,7 @@ If struct field moved, remaining fields still drop; moved field not dropped twic
 Global allocator wraps platform `malloc`/`free` (or embedded `dlmalloc`).
 
 ```buraaq
-let list = new List[i32]()   # allocates List header + buffer
+list = [1, 2, 3]             # growable list (runtime vec)
 ```
 
 When `list` goes out of scope, `List.drop` frees buffer.

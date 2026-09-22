@@ -2,6 +2,8 @@
 
 The Buraaq compiler (`buraaq`) is a multi-phase, incrementally compiled, LLVM-backed toolchain designed for fast rebuilds, excellent diagnostics, and native code quality competitive with Clang `-O2`.
 
+**Guest today:** `compiler-buraaq` emits LLVM text and links with clang. HIR `throws` → `Result` below is the target pipeline. The emitter implements `raise` / `?` / `??` as empty values, `[…]` lists, and `{ "k": v }` maps.
+
 ---
 
 ## 1. Design Goals

@@ -17,6 +17,9 @@ Public language 1.0. Site: [buraaq.dev](https://buraaq.dev). Engineering ledger:
 - `std.grid` — numeric arrays (NumPy job): `zeros`, `dot`, `matmul`
 - Expanded `std.math` scalars
 - Typed `print` / `println` (text, int, float, bool) and project auto-import of unique `std.*`
+- Text lists: `["a", "b"]`, `xs[i]`, `xs.push`, `for s in xs`
+- `raise` returns empty (null / 0) after stderr; `?` forwards empty; `??` still defaults
+- Map literals: `{ "Asim": 30 }`, `m["Asim"]`
 - Keel API keys, CORS allow-lists, auto TLS certs, `BURAAQ_HTTP_PORT` / `BURAAQ_TLS_PORT`
 - `buraaq ship HOST --bundle`, `buraaq build --emit-ir --target linux`
 - Land kit for Hetzner / AWS / Azure / GCP / bare metal
@@ -51,6 +54,7 @@ Legitimate-use policy; Buraaq administration cooperates with lawful agency reque
 - Buraaq Ship / Keel / Dock / Land
 - Fuzz tests: lexer, package manifest parser
 - `buraaq` / `repl` / `-e` / `script` compile snippets with clang (stdin line reader in `buraaq_rt.c`)
+- Unique stdlib names auto-import; `use io` means `std.io`; `connect` / `show` / `keep` need `use db` or `use net` (and the matching pair)
 
 ### Changed
 

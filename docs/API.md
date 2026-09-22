@@ -32,7 +32,7 @@ Install: `install.ps1` / `install.sh`.
 
 | Module | Functions |
 |--------|-----------|
-| `std.io` | `print`, `println`, `eprintln`, `print_int`, `print_float`, `print_bool`, `read_line` |
+| `std.io` | `print`, `println` (text / int / float / bool), `eprintln`, `read_line` |
 | `std.fs` | `read`, `write`, `exists` |
 | `std.text` | `len`, `concat`, `eq`, `byte`, `slice` |
 | `std.math` | `abs_int`, `sqrt`, `min`, `max`, `sin`/`cos`/`tan`, `exp`/`log`/`pow`, `pi`, `clamp`, `lerp` |
@@ -48,6 +48,7 @@ Install: `install.ps1` / `install.sh`.
 | `std.db` | `connect`, `connected`, `exec`, `quote`, `disconnect` |
 | `std.json` | `parse`, `Value.field` (string or number/bool token) |
 | `std.crypto` | `sha256` — real SHA-256 hex |
+| lists / maps | `[1, 2]`, `["a"]`, `{ "k": v }` — guest literals, not `List[T]` / `Map[K,V]` constructors |
 
 ## C runtime
 

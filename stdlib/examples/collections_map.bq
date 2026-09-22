@@ -1,0 +1,7 @@
+# Example: maps
+fn main() {
+    ages = { "Asim": 30, "Ada": 36 }
+    println(ages["Asim"])
+    ages["Ada"] = 37
+    println(ages["Ada"])
+}

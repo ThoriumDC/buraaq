@@ -26,7 +26,7 @@ bq> :quit
 ```bash
 buraaq -e "println(\"hi\")"
 buraaq script path.bq
-buraaq script -e "print_int(40+2)"
+buraaq script -e "println(40+2)"
 ```
 
 ```buraaq

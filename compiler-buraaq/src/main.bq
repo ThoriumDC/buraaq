@@ -222,13 +222,7 @@ fn snippet_src(src: text) -> text {
         return src
     }
     nl = char_of(10)
-    out = concat("use std.io.print", nl)
-    out = concat(out, "use std.io.println")
-    out = concat(out, nl)
-    out = concat(out, "use std.io.print_int")
-    out = concat(out, nl)
-    out = concat(out, "fn main() ")
-    out = concat(out, char_of(123))
+    out = concat("fn main() ", char_of(123))
     out = concat(out, nl)
     if snippet_is_stmt(src) == 1 {
         out = concat(out, src)
@@ -237,7 +231,7 @@ fn snippet_src(src: text) -> text {
         out = concat(out, nl)
         return out
     }
-    out = concat(out, "print_int(")
+    out = concat(out, "println(")
     out = concat(out, src)
     out = concat(out, ")")
     out = concat(out, nl)

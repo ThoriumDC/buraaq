@@ -58,11 +58,14 @@ use http.server.{Server, listen}   # only pub items accessible
 ### 4.1 Syntax
 
 ```buraaq
-use std.io.println                    # single item
-use std.collections.{List, Map}       # multiple items
-use std.net as net                    # namespace alias
-use std.io.*                          # glob (discouraged; lint warn)
+use io                         # std.io (unless you have src/io.bq)
+use io.println                 # one item
+use keel.{page, api, run}      # several items
+use std.io.println             # still valid
+use tx.signed                  # your module; never auto-imported
 ```
+
+Drop the `std.` prefix. Unique stdlib names also import themselves (no `use`). A name exported by two std modules needs `use db` or `use net` (today: `connect`, `show`, `keep`). `std.service` is an alias of `keel`, so `page` / `run` auto-import as keel.
 
 ### 4.2 Resolution order
 

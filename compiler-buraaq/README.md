@@ -33,7 +33,7 @@ buraaq run
 buraaq build
 buraaq doctor
 buraaq test
-buraaq -e "print_int(40+2)"
+buraaq -e "println(40+2)"
 ```
 
 Dump commands:

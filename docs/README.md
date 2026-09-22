@@ -1,5 +1,7 @@
 # Buraaq documentation
 
+**Source of truth for what `dist/buraaq` compiles:** [SYNTAX_REFERENCE.md](SYNTAX_REFERENCE.md). Older spec drafts (`LANGUAGE_SPEC`, `ERROR_MODEL` target `Result`) say so at the top.
+
 Read in this order. Skip what you do not need.
 
 ## Start

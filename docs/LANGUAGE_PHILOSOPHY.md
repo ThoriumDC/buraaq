@@ -65,7 +65,7 @@ Memory and concurrency safety are enforced by the compiler's **Guarded Flow Anal
 - Borrow conflict detection without lifetime annotations
 - Send/Sync capability inference for cross-thread values
 
-Programmers write `let x = ...` and call methods. They do not write `'a`, `&mut`, or `Pin<...>`.
+Programmers write `x = ...` and call methods. They do not write `'a`, `&mut`, or `Pin<...>`.
 
 When the compiler cannot prove safety, it emits a structured error with a suggested fix—often adding `ref`, splitting a variable, or moving an `unsafe` block.
 
@@ -81,7 +81,7 @@ There is no stop-the-world collector in the default model.
 
 ### 3.3 Unified Error Flow
 
-Functions that can fail return `Result[T, E]` or use `throws Error` sugar that desugars to `Result`. Error propagation uses postfix `?`. There are no exceptions with stack unwinding in safe code.
+Functions that can fail use `raise` (stderr + empty return), `?` (forward empty), and `??` (default). There are no exceptions with stack unwinding in safe code. Tagged `Result` / `throws` sugar is the target model; the guest does not tag `Ok` / `Err`.
 
 ### 3.4 Concurrency Without Contagion
 

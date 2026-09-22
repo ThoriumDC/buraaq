@@ -5,6 +5,7 @@ extern c {
     fn buraaq_print_str(s: c.text) -> void
     fn buraaq_print_str_ln(s: c.text) -> void
     fn buraaq_eprint_str_ln(s: c.text) -> void
+    fn buraaq_read_line() -> c.text
     fn buraaq_print_i32(n: c.int) -> void
     fn buraaq_print_i32_ln(n: c.int) -> void
     fn buraaq_print_f64_ln(n: c.float) -> void
@@ -27,6 +28,13 @@ pub fn println(msg: text) {
 pub fn eprintln(msg: text) {
     unsafe {
         buraaq_eprint_str_ln(msg.to_c())
+    }
+}
+
+# One line from stdin, without the trailing newline. EOF is ":quit".
+pub fn read_line() -> text {
+    unsafe {
+        buraaq_read_line()
     }
 }
 
