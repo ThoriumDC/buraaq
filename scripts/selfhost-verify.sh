@@ -75,8 +75,24 @@ assert_printed() {
   echo "PASS $label -> $want"
 }
 
+plant_sysroot() {
+  local exe="$1"
+  local here
+  here="$(cd "$(dirname "$exe")" && pwd)"
+  if [ -f "$here/sysroot/runtime/buraaq_rt.c" ]; then
+    return 0
+  fi
+  mkdir -p "$here/sysroot"
+  rm -rf "$here/sysroot/runtime" "$here/sysroot/src"
+  cp -R "$ROOT/stdlib/runtime" "$here/sysroot/runtime"
+  if [ -d "$ROOT/stdlib/src" ]; then
+    cp -R "$ROOT/stdlib/src" "$here/sysroot/src"
+  fi
+}
+
 hide_rustc
 bq="$(find_compiler)"
+plant_sysroot "$bq"
 ver="$("$bq" --version 2>/dev/null || true)"
 if ! echo "$ver" | grep -q "self-hosted"; then
   echo "compiler --version must contain self-hosted, got '$ver'" >&2

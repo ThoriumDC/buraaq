@@ -6001,6 +6001,26 @@ pub fn find_clang() -> text {
 }
 
 pub fn find_rt() -> text {
+    root = getenv("BURAAQ_ROOT")
+    if len(root) > 0 {
+        p = concat(root, "/stdlib/runtime/buraaq_rt.c")
+        if exists(p) {
+            return p
+        }
+        p = concat(root, "/dist/sysroot/runtime/buraaq_rt.c")
+        if exists(p) {
+            return p
+        }
+        done = 1
+    }
+    sys = getenv("BURAAQ_SYSROOT")
+    if len(sys) > 0 {
+        p = concat(sys, "/runtime/buraaq_rt.c")
+        if exists(p) {
+            return p
+        }
+        done = 1
+    }
     here = l_dir_of(arg(0))
     hit = l_pick_file(
         concat(here, "sysroot/runtime/buraaq_rt.c"),

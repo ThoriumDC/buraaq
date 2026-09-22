@@ -79,6 +79,23 @@ function Find-Compiler {
     throw "selfhost-verify needs a self-hosted Buraaq compiler or compiler-buraaq/boot/stage0.ll."
 }
 
+function Plant-Sysroot($exe) {
+    $here = Split-Path $exe
+    $rt = Join-Path $here "sysroot\runtime\buraaq_rt.c"
+    if (Test-Path $rt) { return }
+    $sys = Join-Path $here "sysroot"
+    New-Item -ItemType Directory -Force -Path $sys | Out-Null
+    $runtime = Join-Path $sys "runtime"
+    if (Test-Path $runtime) { Remove-Item -Recurse -Force $runtime }
+    Copy-Item -Recurse -Force (Join-Path $Root "stdlib\runtime") $runtime
+    $srcIn = Join-Path $Root "stdlib\src"
+    if (Test-Path $srcIn) {
+        $srcOut = Join-Path $sys "src"
+        if (Test-Path $srcOut) { Remove-Item -Recurse -Force $srcOut }
+        Copy-Item -Recurse -Force $srcIn $srcOut
+    }
+}
+
 function Assert-Printed($got, $want, $label) {
     $trim = ($got | ForEach-Object { $_.Trim() })
     if ($trim -ne $want) { throw "$label want '$want' got '$trim'" }
@@ -90,6 +107,7 @@ $Clang = Find-Clang
 $Work = Join-Path $env:TEMP "bq-selfhost-verify"
 New-Item -ItemType Directory -Force -Path $Work | Out-Null
 $Bq = Find-Compiler
+Plant-Sysroot $Bq
 
 $verFile = Join-Path $Work "ver.out"
 $verErr = Join-Path $Work "ver.err"
