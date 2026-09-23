@@ -45,6 +45,10 @@ enum {
     UI_LIST
 };
 
+#ifndef _WIN32
+typedef struct { long left, top, right, bottom; } RECT;
+#endif
+
 typedef struct {
     int kind;
     char id[UI_ID];
@@ -60,10 +64,6 @@ typedef struct {
     char body[512];
     char created[64];
 } UiRow;
-
-#ifndef _WIN32
-typedef struct { long left, top, right, bottom; } RECT;
-#endif
 
 static char g_keep_path[260];
 static int g_next_id = 1;
