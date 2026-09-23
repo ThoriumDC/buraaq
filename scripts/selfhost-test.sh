@@ -2,6 +2,7 @@
 # Prove the product compiler rebuilds itself.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+DEDUPE="$ROOT/scripts/dedupe-ll-declares.py"
 GUEST_SRC="$ROOT/compiler-buraaq/src/main.bq"
 SELFTEST="$ROOT/compiler-buraaq/selftest/main.bq"
 RT="$ROOT/stdlib/runtime/buraaq_rt.c"
@@ -30,11 +31,15 @@ link_guest() {
   local ir="$1"
   local exe="$2"
   local extra=()
+  local libs=(-lpthread -lm)
   if command -v ld.lld >/dev/null 2>&1; then
     extra+=(-fuse-ld=lld)
   fi
+  if [ "$(uname -s)" = "Linux" ]; then
+    libs+=(-lssl -lcrypto)
+  fi
   "$clang_bin" -Wno-override-module -Wno-deprecated-declarations -O0 \
-    "${extra[@]}" -o "$exe" "$ir" "$RT" "$STD" -lpthread -lm
+    "${extra[@]}" -o "$exe" "$ir" "$RT" "$STD" "${libs[@]}"
   chmod +x "$exe"
 }
 
@@ -84,11 +89,13 @@ stage0="$(find_stage0)"
 echo "selfhost-test: stage0=$stage0"
 product="$work/product"
 "$stage0" llvm "$GUEST_SRC" > "$work/guest.ll"
+python3 "$DEDUPE" "$work/guest.ll"
 link_guest "$work/guest.ll" "$product"
 
 assert_selftest "$product" "product"
 
 "$product" llvm "$GUEST_SRC" > "$work/guest2.ll"
+python3 "$DEDUPE" "$work/guest2.ll"
 link_guest "$work/guest2.ll" "$work/stage1"
 assert_selftest "$work/stage1" "stage1"
 

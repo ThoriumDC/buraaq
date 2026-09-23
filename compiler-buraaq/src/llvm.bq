@@ -7059,6 +7059,15 @@ fn l_emit_extern(src: text, idx: int, n: int, sink: text) -> int {
             }
             if eq(fname, "printf") {
                 done = 1
+            } elif len(fname) >= 7 {
+                if eq(slice(fname, 0, 7), "buraaq_") {
+                    # Runtime symbols are declared once in ll_emit_module; skip
+                    # duplicates from each module's extern c { } block (fixpoint link).
+                    done = 1
+                } else {
+                    l_emit(sink, "declare {rtyt} @{fname}({plist})")
+                    done = 1
+                }
             } else {
                 l_emit(sink, "declare {rtyt} @{fname}({plist})")
                 done = 1

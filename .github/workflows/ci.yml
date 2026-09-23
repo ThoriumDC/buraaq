@@ -19,13 +19,21 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang lld
+          sudo apt-get install -y clang lld libssl-dev
           if ! command -v ld.lld >/dev/null 2>&1; then
             found="$(find /usr/lib /usr/bin -name 'ld.lld*' \( -type f -o -type l \) 2>/dev/null | head -n 1 || true)"
             if [ -n "$found" ]; then
               sudo ln -sf "$found" /usr/bin/ld.lld
             fi
           fi
+      - name: Add swap (Linux selfhost LLVM compile)
+        if: runner.os == 'Linux'
+        run: |
+          sudo fallocate -l 4G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=4096
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -h
       - name: Put LLVM on PATH (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -54,7 +62,8 @@ jobs:
           echo "tiny c ok"
           clang -Wno-override-module -Wno-deprecated-declarations -O0 \
             -o /tmp/bq-stage0 compiler-buraaq/boot/stage0.ll \
-            stdlib/runtime/buraaq_rt.c stdlib/runtime/buraaq_std.c -lpthread -lm
+            stdlib/runtime/buraaq_rt.c stdlib/runtime/buraaq_std.c \
+            -lpthread -lm -lssl -lcrypto
           echo "stage0 link ok"
           /tmp/bq-stage0 --version
           echo "stage0 run ok"

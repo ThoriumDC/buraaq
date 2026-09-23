@@ -29,11 +29,15 @@ link_guest() {
   local ir="$1"
   local exe="$2"
   local extra=()
+  local libs=(-lpthread -lm)
   if command -v ld.lld >/dev/null 2>&1; then
     extra+=(-fuse-ld=lld)
   fi
+  if [ "$(uname -s)" = "Linux" ]; then
+    libs+=(-lssl -lcrypto)
+  fi
   "$clang_bin" -Wno-override-module -Wno-deprecated-declarations -O0 \
-    "${extra[@]}" -o "$exe" "$ir" "$RT" "$STD" -lpthread -lm
+    "${extra[@]}" -o "$exe" "$ir" "$RT" "$STD" "${libs[@]}"
   chmod +x "$exe"
 }
 

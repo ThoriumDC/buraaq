@@ -2,6 +2,7 @@
 # Stage0 is a previous guest binary or clang-linked boot/stage0.ll.
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
+$Dedupe = Join-Path $Root "scripts\dedupe-ll-declares.py"
 $GuestSrc = Join-Path $Root "compiler-buraaq\src\main.bq"
 $Selftest = Join-Path $Root "compiler-buraaq\selftest\main.bq"
 $Rt = Join-Path $Root "stdlib\runtime\buraaq_rt.c"
@@ -110,6 +111,8 @@ $code = Invoke-Native $Stage0 @("llvm", $GuestSrc) $Ir $Err
 if ($code -ne 0) {
     throw "stage0 llvm of the guest failed: $(Get-Content -Raw $Err -ErrorAction SilentlyContinue)"
 }
+python $Dedupe $Ir
+if ($LASTEXITCODE -ne 0) { throw "dedupe-ll-declares failed on guest.ll" }
 Link-Guest $Ir $Product
 
 Assert-Selftest $Product "product"
@@ -121,6 +124,8 @@ $code = Invoke-Native $Product @("llvm", $GuestSrc) $Ir2 $Err2
 if ($code -ne 0) {
     throw "product llvm of the guest failed: $(Get-Content -Raw $Err2 -ErrorAction SilentlyContinue)"
 }
+python $Dedupe $Ir2
+if ($LASTEXITCODE -ne 0) { throw "dedupe-ll-declares failed on guest2.ll" }
 Link-Guest $Ir2 $Stage1
 Assert-Selftest $Stage1 "stage1"
 
