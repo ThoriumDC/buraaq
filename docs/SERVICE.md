@@ -186,7 +186,7 @@ If TLS cannot bind, HTTP still serves the same routes and stderr reports the TLS
 `api(...)` needs Postgres. Connection order:
 
 1. `store(url)` if you called it
-2. Else `BURAAQ_DATABASE_URL` (process env, `~/.buraaq/dock/env`, or `forge.env` next to the binary)
+2. Else `BURAAQ_DATABASE_URL` (process env, `~/.buraaq/dock/env`, or an env file next to the binary)
 3. Else `DATABASE_URL`
 4. Else, on Windows only, `host=localhost` with the current user (SSPI attempt), then `127.0.0.1` / `buraaq_play`
 5. Else, on Linux, only if `BURAAQ_PG_LOCAL=1`

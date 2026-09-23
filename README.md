@@ -107,7 +107,7 @@ Gate B: equivalent **n**, Buraaq `--release` vs C++ `-O2`, clang 22. n was not r
 
 ## Already on the metal
 
-Buraaq ships native binaries and Land kits. End-to-end demos (Forge ledger, Flowdesk, etc.) live in a **separate** local tree — `buraaq-play` — and are not part of this public repository.
+Buraaq ships native binaries and Land kits. This public repository is the language, compiler, and stdlib.
 
 Secrets stay in host env. Never in git. Test only machines you own or are authorized to use. **Do not abuse.** [SECURITY.md](SECURITY.md) — Thorium DC cooperates with lawful agency requests.
 

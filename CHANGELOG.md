@@ -26,7 +26,6 @@ Public language 1.0. Site: [buraaq.dev](https://buraaq.dev). Engineering ledger:
 - Keel API keys, CORS allow-lists, auto TLS certs, `BURAAQ_HTTP_PORT` / `BURAAQ_TLS_PORT`
 - `buraaq ship HOST --bundle`, `buraaq build --emit-ir --target linux`
 - Land kit for Hetzner / AWS / Azure / GCP / bare metal
-- Forge example: ownership, concurrency, Keel + Postgres, pack, land
 - Compiler stress/fuzz smoke (mutated programs + random bytes)
 - Loop `defer` on `break` / `continue`
 

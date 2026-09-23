@@ -23,14 +23,13 @@ Do not print `BURAAQ 1.0 RELEASE GATES: PASS` until A–J all pass, including a 
 - Dock is a live accept loop on `:7422` (`GET /v1/health`, `PUT /v1/apps/:name`); pack / launch / ship PUT are real
 - Public package index is in-tree `packages/index.json` (`{"hello":"0.1.0"}`); `buraaq add hello` reads it, `buraaq index` serves it on `:7423`. Hosted `packages.buraaq.dev` is not required
 - Language-tour compile is 60/60
-- Forge (private `buraaq-play/forge`): ownership, spawn, generics, Keel ledger, pack, Hetzner land — not in this public tree
 - Compiler stress/fuzz smoke: 600 mutated programs, 400 random-byte, 10 clang compile+run
 
 ## Gates
 
 | Gate | Status | Evidence |
 |------|--------|----------|
-| A Multi-module native | **PASS** | 10-module exe prints `42`; Forge is 4 modules |
+| A Multi-module native | **PASS** | 10-module exe prints `42` |
 | B Perf vs C++ `-O2` | **PASS** | Orbit fold closes `integer_sum` (**0.00×**, same n); worst `fib_iter` **1.02×** |
 | C–C‴ Bootstrap M3–M25 | **PASS** | CI `selfhost`; `boot/stage0.ll` + clang; mut/float/typed print |
 | D 7-day fuzz | **deferred** | Public 1.0 shipped; wall-clock fuzz continues after launch |
@@ -77,8 +76,8 @@ Measured leftover runs: 23 `1` (text), 25 `42`, 26 `127.0.0.1`, 27 `10`, 28 `99`
 - `{` inside `"..."` interpolates — keep JSON in files, not in Buraaq string literals
 - `ok` is a keyword
 - Pack the `.bur` on the **same OS** as the host (Windows ship will not run on Linux)
-- On Windows, `spawn` then Keel/`libpq` SSL in the same process can AV; Forge runs spawn only under `BURAAQ_COVERAGE_ONLY=1`
+- On Windows, `spawn` then Keel/`libpq` SSL in the same process can AV; keep spawn out of that process or set `BURAAQ_COVERAGE_ONLY=1`
 
 ## Hetzner Land
 
-`buraaq land --cloud hetzner` writes `target/land/`. Forge was landed as a native process on a Hetzner VM (HTTP 8080 / TLS 8443) without touching existing Docker services on 80/443/3000/3100. Postgres credentials stay in host env, never in git.
+`buraaq land --cloud hetzner` writes `target/land/`. A Keel ship is a native process (HTTP 8080 / TLS 8443). Postgres credentials stay in host env, never in git.
