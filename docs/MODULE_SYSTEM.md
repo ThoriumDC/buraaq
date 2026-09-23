@@ -11,7 +11,7 @@ Buraaq modules map directly to the file system. Packages are versioned units wit
 | **Module** | One `.bq` source file = one module |
 | **Package** | Collection of modules + `buraaq.pkg` manifest (≈ crate) |
 | **Workspace** | Multiple packages developed together (v0.9) |
-| **Registry** | Package index at `packages.buraaq.dev` (v1.0 GA) |
+| **Registry** | In-tree `packages/index.json` + `buraaq add` / `buraaq index`. Hosted `packages.buraaq.dev` is next, not required |
 
 ---
 
@@ -98,7 +98,7 @@ license = "MIT"
 
 [dependencies]
 buraaq-std = "1.0"
-json = { version = "^0.4", registry = "https://packages.buraaq.dev" }
+json = { version = "^0.4", path = "packages/json/0.4.0" }
 vendor = { path = "../vendor-lib" }
 gitdep = { git = "https://github.com/org/lib.bq.git", rev = "abc123" }
 
@@ -127,7 +127,7 @@ Content-addressed resolution:
 [[package]]
 name = "json"
 version = "0.4.2"
-source = "registry+https://packages.buraaq.dev"
+source = "packages/json/0.4.2/pkg.bq"
 checksum = "sha256:..."
 dependencies = ["buraaq-std@1.0.0"]
 ```
@@ -163,14 +163,14 @@ Modules imported as `std.io`, `std.net`, etc.
 
 | Command | Description |
 |---------|-------------|
-| `buraaq init myapp` | Create `buraaq.pkg` + `src/main.bq` |
-| `buraaq get github.com/org/pkg` | Add dependency + update lock |
-| `buraaq build` | Build entry module to `target/debug/` or `target/release/` |
+| `buraaq new NAME --cli` | Create `buraaq.pkg` + `src/main.bq` |
+| `buraaq add NAME` | Resolve `packages/index.json` (or `BURAAQ_REGISTRY`) into `.buraaq/cache` |
+| `buraaq fetch URL` | Copy a `file://` or HTTP `pkg.bq` |
+| `buraaq index [DIR]` | Serve the package tree on `:7423` (default `packages/`) |
+| `buraaq build` | Build entry module to a native binary |
 | `buraaq run` | Build + run binary |
-| `buraaq test` | Compile and run `#[test]` functions + `tests/` modules |
-| `buraaq fmt` | Format package sources |
-| `buraaq doc` | Generate HTML docs to `target/doc/` |
-| `buraaq publish` | Upload to registry (auth required, v1.0) |
+| `buraaq test` | Compile and run selftest or a file |
+| `buraaq fmt` | Format a `.bq` file |
 
 ---
 

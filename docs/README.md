@@ -36,6 +36,7 @@ Read in this order. Skip what you do not need.
 ## Language internals (contributors)
 
 - [Status](STATUS.md) — 1.0 evidence and remaining hardening
+- [API](API.md) — frozen CLI + stdlib names (`fmt` / `lsp` / `pack` / `add` / `index` / `debug`)
 - [Bootstrap](BOOTSTRAP.md) — product compiler is self-hosted; prove the chain
 - [Compiler architecture](COMPILER_ARCHITECTURE.md)
 - [Internals](INTERNALS.md)

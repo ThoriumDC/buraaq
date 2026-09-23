@@ -1,6 +1,8 @@
 # Self-hosted Buraaq compiler.
 use lexer.lex_file
+use fmt.cmd_fmt
 use llvm.build_auto
+use llvm.build_debug
 use llvm.build_file
 use llvm.build_project
 use llvm.cmd_new_cli
@@ -10,6 +12,14 @@ use llvm.find_rt
 use llvm.find_std
 use llvm.run_auto
 use llvm.run_project
+use lsp.cmd_lsp
+use pkg.cmd_add
+use pkg.cmd_fetch
+use pkg.cmd_index
+use ship.cmd_dock
+use ship.cmd_launch
+use ship.cmd_pack
+use ship.cmd_ship
 use mir.dump_mir
 use names.dump_names
 use parser.parse_file
@@ -39,6 +49,16 @@ fn usage() {
     eprintln("  buraaq run [FILE.bq]")
     eprintln("  buraaq build [FILE.bq [OUT]]")
     eprintln("  buraaq test [FILE.bq]")
+    eprintln("  buraaq fmt FILE.bq")
+    eprintln("  buraaq lsp-server")
+    eprintln("  buraaq pack")
+    eprintln("  buraaq launch FILE.bur")
+    eprintln("  buraaq ship [HOST] [--bundle FILE.bur]")
+    eprintln("  buraaq dock")
+    eprintln("  buraaq fetch URL [DEST]")
+    eprintln("  buraaq add NAME [--from URL]")
+    eprintln("  buraaq index [DIR]")
+    eprintln("  buraaq debug [FILE.bq]")
     eprintln("  buraaq doctor")
     eprintln("  buraaq --version")
     eprintln("  buraaq -C DIR <cmd>")
@@ -364,6 +384,71 @@ fn do_test(n: int, root: text) {
     exit(1)
 }
 
+fn do_fmt(n: int) {
+    exit(cmd_fmt(operand_at(n, "fmt", 0)))
+}
+
+fn do_fetch(n: int) {
+    exit(cmd_fetch(operand_at(n, "fetch", 0), operand_at(n, "fetch", 1)))
+}
+
+fn do_add(n: int) {
+    name = operand_at(n, "add", 0)
+    src = ""
+    i = 1
+    while i < n {
+        if eq(arg(i), "--from") {
+            if i + 1 < n {
+                src = arg(i + 1)
+            }
+        }
+        i = i + 1
+    }
+    exit(cmd_add(name, src))
+}
+
+fn do_ship(n: int, root: text) {
+    host = ""
+    bundle = ""
+    i = 1
+    while i < n {
+        a = arg(i)
+        if eq(a, "--bundle") {
+            if i + 1 < n {
+                bundle = arg(i + 1)
+            }
+        } elif eq(a, "ship") {
+            done = 1
+        } elif eq(a, "-C") {
+            i = i + 1
+        } else {
+            if len(host) == 0 {
+                host = a
+            }
+        }
+        i = i + 1
+    }
+    exit(cmd_ship(root, host, bundle))
+}
+
+fn do_debug(n: int, root: text) {
+    file = operand_at(n, "debug", 0)
+    if len(file) == 0 {
+        file = "src/main.bq"
+        if len(root) > 0 {
+            file = concat(root, "/src/main.bq")
+        }
+    }
+    out = default_out(file)
+    code = build_debug(file, out)
+    if code != 0 {
+        exit(code)
+    }
+    println(concat("debug binary: ", out))
+    println("lldb: command script import stdlib/debug/lldb_buraaq.py")
+    println("gdb:  source stdlib/debug/gdb_buraaq.py")
+}
+
 fn main() {
     n = args()
     root = flag_c(n)
@@ -411,6 +496,36 @@ fn main() {
             dump_mir(operand_at(n, "mir", 0))
         } elif eq(cmd, "llvm") {
             dump_llvm(operand_at(n, "llvm", 0))
+        } elif eq(cmd, "fmt") {
+            do_fmt(n)
+        } elif eq(cmd, "lsp-server") {
+            exit(cmd_lsp())
+        } elif eq(cmd, "lsp") {
+            exit(cmd_lsp())
+        } elif eq(cmd, "pack") {
+            exit(cmd_pack(root))
+        } elif eq(cmd, "launch") {
+            exit(cmd_launch(operand_at(n, "launch", 0)))
+        } elif eq(cmd, "ship") {
+            do_ship(n, root)
+        } elif eq(cmd, "dock") {
+            pubb = 0
+            i = 1
+            while i < n {
+                if eq(arg(i), "--public") {
+                    pubb = 1
+                }
+                i = i + 1
+            }
+            exit(cmd_dock(pubb))
+        } elif eq(cmd, "fetch") {
+            do_fetch(n)
+        } elif eq(cmd, "add") {
+            do_add(n)
+        } elif eq(cmd, "index") {
+            exit(cmd_index(operand_at(n, "index", 0)))
+        } elif eq(cmd, "debug") {
+            do_debug(n, root)
         } elif ends_bq(cmd) == 1 {
             lex_file(cmd)
         } else {

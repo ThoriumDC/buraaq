@@ -96,23 +96,24 @@ list of names left.
 
 ## What the guest can actually compile
 
-`int`, `text`, `bool`, `float` literals; `mut`; `if`/`elif`/`else`; `while`; `loop`; `for v in a..b`; `unsafe`
+`int`, `text`, `bool`, `float` literals and float locals; `mut`; `if`/`elif`/`else`; `while`; `loop`; `for v in a..b`; `unsafe`
 as a scope; `module` lines; `const` / `static` integers; `continue`; `defer`;
-`spawn` inlined; `trait` skipped; `impl` methods as ordinary functions;
+`spawn` is an OS thread (`bq_sp_{pos}` + `buraaq_thread_spawn` / `join`); `trait` bodies skipped except as vtable shape; `impl` / inherent methods as `Type_method`; `dyn Trait` is a two-slot object (vtable + data);
 `async`/`await` stripped; `type` / `import` / `where` skipped; functions and calls;
 string interpolation; structs; enums and `match`. That is the whole list.
 
-An enum variant is a tag and nothing else: `Color.Red` is the constant 0, and a
-variant carries no payload. Payloads want a heap block with the tag in the first
-slot, which the struct lowering could already do, but they are only worth having
-with generics — an `Option` that cannot say what it holds is not much of one.
+An enum variant with a payload is a two-slot heap object (tag + payload), same
+shape as `Some(x)` / `Ok(x)`. Unit variants stay small integers. `None` is null.
+`match` on a pointer treats null as `None`, compares the tag otherwise, and
+binds the payload from offset 8.
 
 `match` evaluates its subject once and compares it against each arm in turn.
-Patterns are an integer, an `Enum.Variant`, or `_`. Nothing checks
-exhaustiveness, and a subject matching no arm falls out of the match having run
-nothing. Arms are a chain of branches rather than a jump table; tags are small
-and contiguous so a table would be faster, but it needs the arms sorted and the
-gaps filled, and the emitter has nowhere to hold that while streaming a block.
+Patterns are an integer, an `Enum.Variant`, `Some(n)` / `None`, or `_`. Nothing
+checks exhaustiveness, and a subject matching no arm falls out of the match
+having run nothing. Arms are a chain of branches rather than a jump table; tags
+are small and contiguous so a table would be faster, but it needs the arms
+sorted and the gaps filled, and the emitter has nowhere to hold that while
+streaming a block.
 
 `for v in a..b` counts, with `..=` for an inclusive end. The counter starts one
 below `a` and steps at the top of the loop, so the back edge and the exit are the
@@ -211,11 +212,12 @@ golden. `scripts/bootstrap-fixpoint.ps1` runs the same three stages by hand.
 M17 did not yet remove rustc from the product path. M21–M24 did: pack, test,
 run, and clone proof are guest + clang. The old rustc host CLI is deleted;
 `dist/buraaq` is the compiler. Constructs the guest still does not fully lower
-(generics, real concurrent spawn, trait-method dispatch) stay on the still-hardening list.
+Generic functions emit an int copy and a text copy (`fname` / `fname__text`).
+Spawn, mutex, channel, enum payloads, JSON DOM, and `dyn Trait` vtables are lowered.
 
-String interpolation takes a name, not an expression: `"{f(x)}"` reads a local
-called `f(x)`, which no function defines, and the module fails in clang. Bind the
-call to a local first.
+String interpolation evaluates the `{…}` as an expression, including field
+chains (`{self.name}`, `{e.address.city}`). `"{f(x)}"` is still a bad local
+name if the inner parse stops early — bind the call to a local first.
 
 ## M18 — what the goldens actually cover
 
@@ -389,7 +391,7 @@ The same milestone takes `module`, `loop`, and `unsafe` off the refuse list.
 `module` is a line skipped like `use`. `loop { }` is `while true` with the
 labels `break` already jumps to. `unsafe { }` is a scope; the guest still has
 no raw pointers. `extern c { ... }` is skipped so a file that wraps runtime
-calls can load. Generics stay on the still-hardening list.
+calls can load. Generic functions emit int, text, float, and per-call-site struct copies.
 
 ## M23 — rustc is gone from the product path
 
@@ -406,7 +408,7 @@ selftest with rustc off PATH.
 M23 still seeded CI with `cargo build -p buraaq` and refused `spawn` / `trait` /
 `impl` / `async` / `await`, so a fresh clone with only clang could not prove the
 compiler. M24 inlines `spawn { }` (and `spawn f()`) as the body's statements,
-skips `trait` braces, unwraps `impl` so the methods are ordinary functions,
+skips `trait` braces, emits `impl` / inherent methods as `Type_method`,
 strips `async` / `await`, and commits `compiler-buraaq/boot/stage0.ll`. CI's
 `selfhost` job has no rust-toolchain: clang links that IR, then
 `scripts/selfhost-test` rebuilds the guest and runs `buraaq test`. Pack and
@@ -439,4 +441,4 @@ Stdin is `read("-")` / `buraaq_read_line` in the C runtime.
 
 ## Not this track
 
-Gate D (7-day fuzz), registry, DAP, channels. Those stay on the 1.0 gate list.
+Gate D (7-day fuzz) stays on the 1.0 gate list. Guest `fmt` / `lsp` / `pack` / `ship` / `dock` / `fetch` / `add` / `index` / `debug` are subcommands of the product CLI. Generic int/text/float/struct copies ship. Hosted `packages.buraaq.dev` is next; the in-tree index is `packages/index.json`.

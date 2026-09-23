@@ -25,6 +25,9 @@ Ownership: move by default, `ref` / `ref mut`, GFA (E0302 / E0312).
 | `buraaq script FILE.bq` | Compile and run a `.bq` file |
 | `buraaq --version` | `buraaq 1.0.0 (self-hosted)` |
 | `buraaq -C DIR <cmd>` | Run the command with that project directory |
+| `buraaq pack` / `launch` / `ship` / `dock` | Hashed `.bur` bundle; live dock accept on `:7422` |
+| `buraaq fetch` / `add` / `index` | Registry client + in-tree `packages/index.json` |
+| `buraaq fmt` / `lsp` / `debug` | Format a file; LSP stdio; clang `-O0 -g` + pretty-printers |
 
 Install: `install.ps1` / `install.sh`.
 
@@ -47,7 +50,7 @@ Install: `install.ps1` / `install.sh`.
 | `std.flowdesk` | `desk`, `show` — borderless Windows shell + Vein (UI Automation text) |
 | `std.http` | `get` — `file://` all hosts; `https://` via WinINet (Windows) or OpenSSL when linked |
 | `std.db` | `connect`, `connected`, `exec`, `quote`, `disconnect` |
-| `std.json` | `parse`, `Value.field` (string or number/bool token) |
+| `std.json` | `parse`, `stringify`, `Value.field` / `item` / `as_int` / `as_text` / `kind` / `count` |
 | `std.crypto` | `sha256` — real SHA-256 hex |
 | lists / maps | `[1, 2]`, `["a"]`, `{ "k": v }` — guest literals, not `List[T]` / `Map[K,V]` constructors |
 

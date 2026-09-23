@@ -23,7 +23,7 @@ At 1.0, the following are **frozen**:
 - Module system: `module`, `use io` / `use std.io`, unique `std.*` auto-import, `buraaq.pkg`
 - Error model: `raise` / `?` / `??` (empty values). Tagged `Result` is the target, not the guest freeze.
 
-**May still grow after 1.0:** generic constraints, JSON DOM, channels, registry fetch. Diagnostic **IDs** stay stable; wording may improve.
+**May still grow after 1.0:** generic constraints beyond the int/text/float/struct copies, hosted packages.buraaq.dev. Diagnostic **IDs** stay stable; wording may improve.
 
 ## ABI policy (1.0 target)
 
@@ -40,7 +40,7 @@ At 1.0, the following are **frozen**:
 ## Package policy
 
 - Registry-agnostic: projects are directories + `buraaq.pkg` + `buraaq.lock`
-- Dependencies resolved with semver; yanked versions rejected at lock time
+- In-tree index is `packages/index.json`; hosted `packages.buraaq.dev` is next
 - No implicit network fetch in 1.0 core (explicit `buraaq add` only)
 
 ## Unsafe code policy

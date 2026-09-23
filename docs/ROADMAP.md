@@ -7,18 +7,14 @@ Buraaq 1.0 is the language you install and ship. What remains is hardening and e
 | Item | Why |
 |------|-----|
 | Gate D 7-day fuzz | Wall-clock evidence; scripts already refuse to lie |
-| Guest generics / trait dispatch | Product compiler does not yet lower these |
-| Guest Ship / LSP / fmt | Old host CLI had these; they are not subcommands of `dist/buraaq` yet |
 
 ## Next
 
 | Item | Why |
 |------|-----|
-| Package registry `packages.buraaq.dev` | Fetch beyond path deps |
-| POSIX HTTPS with OpenSSL by default | Windows WinINet already works |
-| JSON DOM | Field extract is 1.0; full tree is next |
-| Channels / cancellation | Spawn works; richer concurrency |
-| DAP pretty printers | clang `-g` already emits symbols |
+| Hosted index at packages.buraaq.dev | In-tree `packages/index.json` is fetchable; guest `add` / `index` already serve and resolve it |
+| POSIX HTTPS with OpenSSL by default | Guest `build_auto` already passes `-lssl -lcrypto`; Windows WinINet already works |
+| Channels cancellation | Send/recv and spawn are real OS primitives; no cancel yet |
 
 ## Not the product
 

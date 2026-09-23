@@ -10,8 +10,8 @@ Buraaq 1.0. Ten names when you count Strata under Mind. One path from source to 
 | **Hold** | Named columns (the Pandas job). | `hold`, `stow`, `pick` |
 | **Grid** | Numeric arrays (the NumPy job). | `zeros`, `dot`, `matmul` |
 | **Ship** | Hashed native bundle (`.bur`). Not a VM. | `buraaq pack` / `buraaq ship` |
-| **Dock** | Tiny host agent that receives ships and runs them. | `buraaq dock` |
-| **Land** | Same install on AWS, Azure, GCP, Hetzner, or bare metal. | `buraaq land` / `buraaq up` |
+| **Dock** | Live accept loop on `:7422` (health + PUT). | `buraaq dock` / `dock --public` |
+| **Land** | Same-OS install kit (guest path is pack + `ship HOST`; `land` / `up` are thinner). | `buraaq pack` / `buraaq ship HOST` |
 | **Mind** | Local models, planning, OpenAI-compatible serve. | `buraaq ai` / `std.ai` |
 | **Strata** | Layered model residency: GPU → RAM → NVMe. | `buraaq ai strata` / `--strata` |
 | **Lumen** | Optional native HD UI. | `app`, `heading`, `show` |

@@ -1,0 +1,138 @@
+# Format a .bq file: 4-space indent, opening brace on the same line.
+use std.fs.read
+use std.fs.write
+use std.io.eprintln
+use std.io.println
+use std.text.byte
+use std.text.char_of
+use std.text.concat
+use std.text.eq
+use std.text.len
+use std.text.slice
+
+fn fmt_is_ws(c: int) -> int {
+    if c == 32 {
+        return 1
+    }
+    if c == 9 {
+        return 1
+    }
+    if c == 13 {
+        return 1
+    }
+    0
+}
+
+fn fmt_pad(n: int) -> text {
+    s = ""
+    i = 0
+    while i < n {
+        s = concat(s, "    ")
+        i = i + 1
+    }
+    s
+}
+
+pub fn fmt_source(src: text) -> text {
+    n = len(src)
+    i = 0
+    indent = 0
+    out = ""
+    col = 0
+    while i < n {
+        c = byte(src, i)
+        if c == 34 {
+            out = concat(out, slice(src, i, i + 1))
+            i = i + 1
+            col = col + 1
+            while i < n {
+                b = byte(src, i)
+                out = concat(out, slice(src, i, i + 1))
+                i = i + 1
+                col = col + 1
+                if b == 92 {
+                    if i < n {
+                        out = concat(out, slice(src, i, i + 1))
+                        i = i + 1
+                    }
+                } elif b == 34 {
+                    break
+                }
+            }
+        } elif c == 35 {
+            while i < n {
+                if byte(src, i) == 10 {
+                    break
+                }
+                out = concat(out, slice(src, i, i + 1))
+                i = i + 1
+            }
+        } elif c == 10 {
+            out = concat(out, char_of(10))
+            i = i + 1
+            col = 0
+            while i < n {
+                if fmt_is_ws(byte(src, i)) == 1 {
+                    i = i + 1
+                } else {
+                    break
+                }
+            }
+            next = 0
+            if i < n {
+                next = byte(src, i)
+            }
+            spaces = indent
+            if next == 125 {
+                if spaces > 0 {
+                    spaces = spaces - 1
+                }
+            }
+            out = concat(out, fmt_pad(spaces))
+        } elif c == 123 {
+            out = concat(out, char_of(123))
+            indent = indent + 1
+            i = i + 1
+            col = col + 1
+        } elif c == 125 {
+            if indent > 0 {
+                indent = indent - 1
+            }
+            out = concat(out, char_of(125))
+            i = i + 1
+            col = col + 1
+        } elif fmt_is_ws(c) == 1 {
+            if col > 0 {
+                out = concat(out, " ")
+                col = col + 1
+            }
+            while i < n {
+                if fmt_is_ws(byte(src, i)) == 1 {
+                    i = i + 1
+                } else {
+                    break
+                }
+            }
+        } else {
+            out = concat(out, slice(src, i, i + 1))
+            i = i + 1
+            col = col + 1
+        }
+    }
+    out
+}
+
+pub fn cmd_fmt(path: text) -> int {
+    if len(path) == 0 {
+        eprintln("buraaq fmt FILE.bq")
+        return 1
+    }
+    src = read(path)
+    if len(src) == 0 {
+        eprintln(concat("buraaq fmt: cannot read ", path))
+        return 1
+    }
+    write(path, fmt_source(src))
+    println(concat("formatted ", path))
+    0
+}

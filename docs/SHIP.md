@@ -48,18 +48,15 @@ Use Docker when you need a foreign OS. Use Ship when the app **is** Buraaq — c
 
 | Command | What it does |
 |---------|----------------|
-| `buraaq up` | Pack, start local Dock if needed, push and run |
-| `buraaq pack` | Release-build, write `target/ship/<app>.bur` |
-| `buraaq land [user@HOST]` | Write Land kit; optional SSH install of Dock |
+| `buraaq pack` | Build, write `target/ship/<app>.bur` |
 | `buraaq launch FILE.bur` | Verify hash, extract, run in the foreground |
 | `buraaq ship` | Pack and launch locally |
 | `buraaq ship HOST` | Pack and **PUT** the bundle to a dock |
 | `buraaq ship HOST --bundle FILE.bur` | Push a ship you already packed (same OS as the host) |
-| `buraaq ship --status HOST` | List apps on a dock |
-| `buraaq ship --stop NAME HOST` | Stop an app on a dock |
-| `buraaq dock` | Host agent on `127.0.0.1:7422` |
+| `buraaq dock` | Live accept loop on `127.0.0.1:7422` |
 | `buraaq dock --public` | Bind `0.0.0.0:7422` |
-| `buraaq dock --bind ADDR` | Custom bind (example `0.0.0.0:7422`) |
+
+Guest grain: `ship --status` / `ship --stop` / `dock --bind` / `up` / `land` are thinner than the walkthrough below. The measured path is pack, launch, `ship HOST`, and a live dock.
 
 The `.bur` includes:
 
@@ -74,7 +71,7 @@ Every byte before the trailing digest is SHA-256 hashed. Tamper → refuse to la
 
 ## Dock protocol
 
-Control plane is HTTP/1.1 on port **7422**.
+Dock is a **live accept loop** (Winsock / POSIX). Control plane is HTTP/1.1 on port **7422**. Measured: `GET /v1/health` → `{"ok":true}`; `PUT /v1/apps/:name` → 201.
 
 | Method | Path | Role |
 |--------|------|------|

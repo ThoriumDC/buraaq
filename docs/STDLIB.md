@@ -318,9 +318,12 @@ Call other APIs. Servers belong in `std.keel`.
 
 | API | Description |
 |-----|-------------|
-| `parse(text) -> Value` | Parse JSON document |
-| `stringify(v) -> text` | Serialize |
-| `Value.field(key) -> text` | Extract string field (v1) |
+| `parse(text) -> Value` | Parse a JSON document into a DOM |
+| `stringify(v) -> text` | Serialize a DOM back to text |
+| `Value.field(key) -> text` | Child as text (string content, or stringify) |
+| `Value.item(i) -> Value` | Array element |
+| `Value.as_int()` / `as_text()` | Coerce a node |
+| `Value.kind()` / `count()` | 0=null … 6=object; length of array/object |
 
 ### `std.collections`
 
@@ -492,7 +495,7 @@ Safe wrappers live in std modules; raw `extern c` calls stay in `unsafe` blocks.
 
 ## Allocation strategy
 
-- **Heap**: `text` concat, file read, JSON field extract — one allocation per call
+- **Heap**: `text` concat, file read, JSON DOM nodes — one allocation per call / node
 - **Stack**: primitives, struct literals, mutex handles (v1 stub)
 - **Benchmark**: Gate B benches in `benchmarks/` measure concat and numeric work
 
@@ -511,7 +514,8 @@ Examples live in `stdlib/examples/` — one per major module group. Games: `nova
 | Stdlib source modules | ✅ |
 | C runtime linked on build | ✅ |
 | Unique `std.*` auto-import; `use io` / `use std.io` | ✅ |
-| User `extern c` codegen | 🔄 partial |
-| Multi-module package build | 🔄 planned |
+| User `extern c` codegen | ✅ |
+| Multi-module package build | ✅ Gate A: 10-module exe |
+| In-tree package index | ✅ `packages/index.json` + `buraaq add` / `buraaq index` |
 
-Imports parse today; full cross-module builds will land with the package resolver.
+Imports resolve. Unique `std.*` names auto-import. Sibling modules take `use sibling.item`.

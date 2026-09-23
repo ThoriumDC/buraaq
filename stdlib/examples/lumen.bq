@@ -6,7 +6,7 @@ use std.lumen.{app, heading, note, field, button, bind, show}
 fn main() {
     app("Harbor", 1280, 800)
     heading("Deploy jobs")
-    note("Native Lumen console for a Keel API")
+    note("A quiet console for a Keel API. Enter saves. F5 refreshes.")
     field("title", "Title")
     field("body", "Details")
     button("create", "Create job")

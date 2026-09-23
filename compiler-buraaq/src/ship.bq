@@ -1,0 +1,89 @@
+# Pack / launch / ship a hashed native bundle (.bur)
+use llvm.build_auto
+use llvm.project_entry
+use llvm.project_name
+use llvm.project_out
+use std.fs.exists
+use std.fs.mkdir
+use std.io.eprintln
+use std.io.println
+use std.os.getenv
+use std.text.concat
+use std.text.eq
+use std.text.len
+
+extern c {
+    fn buraaq_bur_pack(exe: c.text, pkg: c.text, out_path: c.text) -> int
+    fn buraaq_bur_launch(bur: c.text) -> int
+    fn buraaq_http_put_file(url: c.text, path: c.text, token: c.text) -> int
+    fn buraaq_dock_run(public_bind: int) -> int
+}
+
+fn ship_join(a: text, b: text) -> text {
+    if len(a) == 0 {
+        return b
+    }
+    concat(a, concat("/", b))
+}
+
+pub fn cmd_pack(root: text) -> int {
+    src = project_entry(root)
+    if len(src) == 0 {
+        eprintln("buraaq pack: no src/main.bq")
+        return 1
+    }
+    exe = project_out(root)
+    code = build_auto(src, exe)
+    if code != 0 {
+        return code
+    }
+    mkdir("target")
+    mkdir("target/ship")
+    out = concat("target/ship/", concat(project_name(root), ".bur"))
+    pkg = "buraaq.pkg"
+    if exists(pkg) == 0 {
+        pkg = ""
+    }
+    code = buraaq_bur_pack(exe, pkg, out)
+    if code == 0 {
+        println(concat("packed ", out))
+    } else {
+        eprintln("buraaq pack: failed to write .bur")
+    }
+    code
+}
+
+pub fn cmd_launch(bur: text) -> int {
+    if len(bur) == 0 {
+        eprintln("buraaq launch FILE.bur")
+        return 1
+    }
+    buraaq_bur_launch(bur)
+}
+
+pub fn cmd_ship(root: text, host: text, bundle: text) -> int {
+    bur = bundle
+    if len(bur) == 0 {
+        code = cmd_pack(root)
+        if code != 0 {
+            return code
+        }
+        bur = concat("target/ship/", concat(project_name(root), ".bur"))
+    }
+    if len(host) == 0 {
+        return cmd_launch(bur)
+    }
+    token = getenv("BURAAQ_DOCK_TOKEN")
+    url = concat("http://", concat(host, concat(":7422/v1/apps/", project_name(root))))
+    code = buraaq_http_put_file(url, bur, token)
+    if code == 0 {
+        println(concat("shipped ", bur))
+    } else {
+        eprintln(concat("buraaq ship: PUT failed for ", url))
+    }
+    code
+}
+
+pub fn cmd_dock(public_bind: int) -> int {
+    buraaq_dock_run(public_bind)
+}

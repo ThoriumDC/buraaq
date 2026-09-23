@@ -82,6 +82,8 @@ static char g_status[256] = "Ready";
 static int g_live;
 static char g_clicked[UI_ID];
 static int g_running;
+static int g_hover_row = -1;
+static int g_caret;
 
 #ifdef _WIN32
 static HWND g_hwnd;
@@ -90,18 +92,29 @@ static HFONT g_font_title;
 static HFONT g_font_body;
 static HFONT g_font_small;
 static HFONT g_font_btn;
+static HFONT g_font_label;
 
 static int px(int logical) { return MulDiv(logical, g_dpi, 96); }
 
-static COLORREF col_bg(void) { return RGB(240, 253, 250); }
-static COLORREF col_fg(void) { return RGB(19, 78, 74); }
+/* Stone canvas, ink type, teal used only for live + focus. */
+static COLORREF col_bg(void) { return RGB(245, 243, 239); }
+static COLORREF col_bar(void) { return RGB(245, 243, 239); }
+static COLORREF col_fg(void) { return RGB(28, 25, 23); }
 static COLORREF col_primary(void) { return RGB(13, 148, 136); }
-static COLORREF col_accent(void) { return RGB(234, 88, 12); }
+static COLORREF col_ink(void) { return RGB(28, 25, 23); }
+static COLORREF col_ink_hot(void) { return RGB(68, 64, 60); }
 static COLORREF col_card(void) { return RGB(255, 255, 255); }
-static COLORREF col_border(void) { return RGB(153, 246, 228); }
-static COLORREF col_muted(void) { return RGB(71, 85, 105); }
-static COLORREF col_danger(void) { return RGB(220, 38, 38); }
-static COLORREF col_on_acc(void) { return RGB(0, 0, 0); }
+static COLORREF col_row(void) { return RGB(250, 249, 246); }
+static COLORREF col_border(void) { return RGB(231, 229, 228); }
+static COLORREF col_line(void) { return RGB(214, 211, 209); }
+static COLORREF col_muted(void) { return RGB(120, 113, 108); }
+static COLORREF col_danger(void) { return RGB(185, 28, 28); }
+static COLORREF col_on_ink(void) { return RGB(250, 250, 249); }
+static COLORREF col_focus_fill(void) { return RGB(255, 255, 255); }
+
+#define LUMEN_ROW 76
+#define LUMEN_ROW_GAP 10
+#define LUMEN_BAR 52
 
 static void utf8_to_wide(const char *s, wchar_t *o, int cap) {
     if (!s) s = "";
@@ -109,9 +122,10 @@ static void utf8_to_wide(const char *s, wchar_t *o, int cap) {
     o[cap - 1] = 0;
 }
 
-static void fill_round(HDC hdc, RECT r, COLORREF fill, COLORREF border, int rad) {
+static void fill_round_w(HDC hdc, RECT r, COLORREF fill, COLORREF border, int rad, int penw) {
+    if (penw < 1) penw = 1;
     HBRUSH br = CreateSolidBrush(fill);
-    HPEN pn = CreatePen(PS_SOLID, px(1), border);
+    HPEN pn = CreatePen(PS_SOLID, penw, border);
     HGDIOBJ obr = SelectObject(hdc, br);
     HGDIOBJ opn = SelectObject(hdc, pn);
     RoundRect(hdc, r.left, r.top, r.right, r.bottom, rad, rad);
@@ -119,6 +133,45 @@ static void fill_round(HDC hdc, RECT r, COLORREF fill, COLORREF border, int rad)
     SelectObject(hdc, opn);
     DeleteObject(br);
     DeleteObject(pn);
+}
+
+static void fill_round(HDC hdc, RECT r, COLORREF fill, COLORREF border, int rad) {
+    fill_round_w(hdc, r, fill, border, rad, 1);
+}
+
+static void draw_hairline(HDC hdc, int x1, int y, int x2, COLORREF c) {
+    HPEN pn = CreatePen(PS_SOLID, 1, c);
+    HGDIOBJ opn = SelectObject(hdc, pn);
+    MoveToEx(hdc, x1, y, NULL);
+    LineTo(hdc, x2, y);
+    SelectObject(hdc, opn);
+    DeleteObject(pn);
+}
+
+static void draw_dot(HDC hdc, int cx, int cy, int r, COLORREF c) {
+    HBRUSH br = CreateSolidBrush(c);
+    HPEN pn = CreatePen(PS_SOLID, 1, c);
+    HGDIOBJ obr = SelectObject(hdc, br);
+    HGDIOBJ opn = SelectObject(hdc, pn);
+    Ellipse(hdc, cx - r, cy - r, cx + r, cy + r);
+    SelectObject(hdc, obr);
+    SelectObject(hdc, opn);
+    DeleteObject(br);
+    DeleteObject(pn);
+}
+
+static int measure_text(HFONT font, const char *s) {
+    if (!g_hwnd) return px((int)strlen(s ? s : "") * 7);
+    HDC hdc = GetDC(g_hwnd);
+    if (!hdc) return px(120);
+    wchar_t w[256];
+    utf8_to_wide(s ? s : "", w, 256);
+    SIZE sz = {0};
+    HGDIOBJ old = SelectObject(hdc, font);
+    GetTextExtentPoint32W(hdc, w, (int)wcslen(w), &sz);
+    SelectObject(hdc, old);
+    ReleaseDC(g_hwnd, hdc);
+    return sz.cx;
 }
 
 static void draw_text(HDC hdc, HFONT font, COLORREF c, RECT r, const char *s, UINT fmt) {
@@ -457,27 +510,67 @@ static void ui_delete_id(const char *id) {
 
 static void ui_layout(int w, int h) {
     int pad = px(48);
-    int gap = px(16);
     int cw = w - pad * 2;
-    if (cw > px(720)) cw = px(720);
+    if (cw > px(640)) cw = px(640);
     int x = (w - cw) / 2;
-    int y = pad;
+    int y = px(LUMEN_BAR) + px(36);
     for (int i = 0; i < g_nw; i++) {
         UiW *e = &g_w[i];
         int ht = px(40);
-        if (e->kind == UI_HEADING) ht = px(48);
-        else if (e->kind == UI_NOTE) ht = px(28);
-        else if (e->kind == UI_FIELD) ht = px(72);
-        else if (e->kind == UI_BUTTON) ht = px(44);
-        else if (e->kind == UI_LIST) ht = h - y - pad;
+        int gap = px(16);
+        if (e->kind == UI_HEADING) {
+            ht = px(36);
+            gap = px(8);
+        } else if (e->kind == UI_NOTE) {
+            ht = px(40);
+            gap = px(28);
+        } else if (e->kind == UI_FIELD) {
+            ht = px(66);
+            gap = px(14);
+        } else if (e->kind == UI_BUTTON) {
+            ht = px(40);
+            gap = px(28);
+        } else if (e->kind == UI_LIST) {
+            ht = h - y - px(28);
+            gap = 0;
+        }
         if (ht < px(24)) ht = px(24);
         e->box.left = x;
         e->box.top = y;
         e->box.right = x + cw;
-        if (e->kind == UI_BUTTON) e->box.right = x + px(168);
+        if (e->kind == UI_BUTTON) {
+            int bw = measure_text(g_font_btn, e->label) + px(40);
+            if (bw < px(112)) bw = px(112);
+            if (bw > cw) bw = cw;
+            e->box.right = x + bw;
+        }
         e->box.bottom = y + ht;
         y += ht + gap;
     }
+}
+
+static void ui_paint_bar(HDC hdc, int w) {
+    RECT bar = {0, 0, w, px(LUMEN_BAR)};
+    HBRUSH br = CreateSolidBrush(col_bar());
+    FillRect(hdc, &bar, br);
+    DeleteObject(br);
+    draw_hairline(hdc, 0, px(LUMEN_BAR) - 1, w, col_line());
+
+    RECT title = {px(48), 0, w / 2, px(LUMEN_BAR)};
+    draw_text(hdc, g_font_label, col_fg(), title, g_title, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+
+    int pill_w = measure_text(g_font_small, g_status) + px(36);
+    if (pill_w < px(88)) pill_w = px(88);
+    if (pill_w > w / 2) pill_w = w / 2;
+    RECT pill = {w - px(48) - pill_w, px(12), w - px(48), px(LUMEN_BAR) - px(12)};
+    fill_round(hdc, pill, col_card(), col_border(), px(16));
+    COLORREF live = g_live ? col_primary() : col_danger();
+    draw_dot(hdc, pill.left + px(12), (pill.top + pill.bottom) / 2, px(3), live);
+    RECT st = pill;
+    st.left += px(22);
+    st.right -= px(10);
+    draw_text(hdc, g_font_small, col_muted(), st, g_status,
+              DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 }
 
 static void ui_paint(HDC hdc, int w, int h) {
@@ -485,56 +578,56 @@ static void ui_paint(HDC hdc, int w, int h) {
     HBRUSH bg = CreateSolidBrush(col_bg());
     FillRect(hdc, &all, bg);
     DeleteObject(bg);
-
-    RECT badge = {px(48), px(20), w - px(48), px(44)};
-    draw_text(hdc, g_font_small, g_live ? col_primary() : col_danger(), badge, g_status,
-              DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    ui_paint_bar(hdc, w);
 
     for (int i = 0; i < g_nw; i++) {
         UiW *e = &g_w[i];
         RECT r = e->box;
         if (e->kind == UI_HEADING) {
-            draw_text(hdc, g_font_title, col_fg(), r, e->label, DT_LEFT | DT_BOTTOM | DT_SINGLELINE);
+            draw_text(hdc, g_font_title, col_fg(), r, e->label,
+                      DT_LEFT | DT_BOTTOM | DT_SINGLELINE | DT_END_ELLIPSIS);
         } else if (e->kind == UI_NOTE) {
             draw_text(hdc, g_font_body, col_muted(), r, e->label, DT_LEFT | DT_TOP | DT_WORDBREAK);
         } else if (e->kind == UI_FIELD) {
             RECT lab = r;
-            lab.bottom = r.top + px(22);
-            draw_text(hdc, g_font_small, col_fg(), lab, e->label, DT_LEFT | DT_BOTTOM | DT_SINGLELINE);
+            lab.bottom = r.top + px(20);
+            draw_text(hdc, g_font_label, col_muted(), lab, e->label,
+                      DT_LEFT | DT_BOTTOM | DT_SINGLELINE);
             RECT box = r;
-            box.top = r.top + px(26);
-            fill_round(hdc, box, col_card(), e->hot || g_focus == i ? col_primary() : col_border(), px(10));
+            box.top = r.top + px(24);
+            int focus = (g_focus == i);
+            COLORREF border = focus ? col_primary() : (e->hot ? col_line() : col_border());
+            COLORREF fill = focus ? col_focus_fill() : col_card();
+            fill_round_w(hdc, box, fill, border, px(8), focus ? 2 : 1);
             RECT tr = box;
-            tr.left += px(12);
-            tr.right -= px(12);
-            tr.top += px(6);
-            const char *show = e->value[0] ? e->value : "";
+            tr.left += px(14);
+            tr.right -= px(14);
+            const char *show = e->value;
             draw_text(hdc, g_font_body, show[0] ? col_fg() : col_muted(), tr, show,
                       DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
-            if (g_focus == i) {
+            if (focus && g_caret) {
                 SIZE sz = {0};
                 wchar_t ww[UI_VAL];
                 utf8_to_wide(e->value, ww, UI_VAL);
                 HGDIOBJ old = SelectObject(hdc, g_font_body);
                 GetTextExtentPoint32W(hdc, ww, (int)wcslen(ww), &sz);
                 SelectObject(hdc, old);
-                int cx = tr.left + sz.cx + px(1);
-                int cy1 = box.top + px(10);
-                int cy2 = box.bottom - px(10);
-                HPEN pn = CreatePen(PS_SOLID, px(1), col_primary());
+                int cx = tr.left + sz.cx + 1;
+                int mid = (box.top + box.bottom) / 2;
+                HPEN pn = CreatePen(PS_SOLID, 1, col_fg());
                 HGDIOBJ opn = SelectObject(hdc, pn);
-                MoveToEx(hdc, cx, cy1, NULL);
-                LineTo(hdc, cx, cy2);
+                MoveToEx(hdc, cx, mid - px(8), NULL);
+                LineTo(hdc, cx, mid + px(8));
                 SelectObject(hdc, opn);
                 DeleteObject(pn);
             }
         } else if (e->kind == UI_BUTTON) {
-            COLORREF fill = e->hot ? RGB(249, 115, 22) : col_accent();
-            fill_round(hdc, r, fill, fill, px(10));
-            draw_text(hdc, g_font_btn, col_on_acc(), r, e->label,
+            COLORREF fill = e->hot ? col_ink_hot() : col_ink();
+            fill_round(hdc, r, fill, fill, px(8));
+            draw_text(hdc, g_font_btn, col_on_ink(), r, e->label,
                       DT_CENTER | DT_VCENTER | DT_SINGLELINE);
         } else if (e->kind == UI_LIST) {
-            fill_round(hdc, r, col_card(), col_border(), px(16));
+            fill_round(hdc, r, col_card(), col_border(), px(12));
             RECT clip = r;
             clip.left += px(16);
             clip.right -= px(16);
@@ -545,31 +638,33 @@ static void ui_paint(HDC hdc, int w, int h) {
             int y = clip.top - g_scroll;
             if (g_nrows == 0) {
                 draw_text(hdc, g_font_body, col_muted(), clip,
-                          g_bound ? "No jobs yet. Create one." : "No notes yet. Write one.",
+                          g_bound ? "Nothing here yet." : "Write something, then save it.",
                           DT_CENTER | DT_VCENTER | DT_SINGLELINE);
             }
             for (int k = 0; k < g_nrows; k++) {
-                RECT card = {clip.left, y, clip.right, y + px(108)};
+                RECT card = {clip.left, y, clip.right, y + px(LUMEN_ROW)};
                 if (card.bottom > clip.top && card.top < clip.bottom) {
-                    fill_round(hdc, card, col_bg(), col_border(), px(12));
+                    int hover = (g_hover_row == k);
+                    fill_round(hdc, card, hover ? col_row() : col_bg(), col_border(), px(8));
                     RECT t = card;
                     t.left += px(16);
-                    t.right -= px(96);
+                    t.right -= px(80);
                     t.top += px(12);
-                    t.bottom = t.top + px(28);
+                    t.bottom = t.top + px(22);
                     draw_text(hdc, g_font_btn, col_fg(), t, g_rows[k].title,
                               DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
-                    t.top = t.bottom;
-                    t.bottom += px(36);
-                    draw_text(hdc, g_font_small, col_muted(), t, g_rows[k].body,
+                    t.top = t.bottom + px(2);
+                    t.bottom = card.bottom - px(12);
+                    const char *sub = g_rows[k].body[0] ? g_rows[k].body : g_rows[k].created;
+                    draw_text(hdc, g_font_small, col_muted(), t, sub,
                               DT_LEFT | DT_TOP | DT_WORDBREAK | DT_END_ELLIPSIS);
-                    RECT del = {card.right - px(84), card.top + px(16), card.right - px(16),
-                                card.top + px(48)};
-                    fill_round(hdc, del, col_card(), col_danger(), px(8));
-                    draw_text(hdc, g_font_small, col_danger(), del, "Delete",
-                              DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+                    if (hover) {
+                        RECT del = {card.right - px(72), card.top, card.right - px(12), card.bottom};
+                        draw_text(hdc, g_font_small, col_danger(), del, "Remove",
+                                  DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+                    }
                 }
-                y += px(120);
+                y += px(LUMEN_ROW + LUMEN_ROW_GAP);
             }
             SelectClipRgn(hdc, NULL);
             DeleteObject(rg);
@@ -577,18 +672,33 @@ static void ui_paint(HDC hdc, int w, int h) {
     }
 }
 
-static int hit_list_delete(int mx, int my) {
+static int hit_list_row(int mx, int my) {
+    POINT pt = {mx, my};
     for (int i = 0; i < g_nw; i++) {
         if (g_w[i].kind != UI_LIST) continue;
         RECT r = g_w[i].box;
         int pad = px(16);
         int y = r.top + pad - g_scroll;
         for (int k = 0; k < g_nrows; k++) {
-            RECT del = {r.right - pad - px(84), y + px(16), r.right - pad - px(16), y + px(48)};
-            POINT pt = {mx, my};
-            if (PtInRect(&del, pt)) return k;
-            y += px(120);
+            RECT card = {r.left + pad, y, r.right - pad, y + px(LUMEN_ROW)};
+            if (PtInRect(&card, pt)) return k;
+            y += px(LUMEN_ROW + LUMEN_ROW_GAP);
         }
+    }
+    return -1;
+}
+
+static int hit_list_delete(int mx, int my) {
+    int k = hit_list_row(mx, my);
+    if (k < 0) return -1;
+    for (int i = 0; i < g_nw; i++) {
+        if (g_w[i].kind != UI_LIST) continue;
+        RECT r = g_w[i].box;
+        int pad = px(16);
+        int y = r.top + pad - g_scroll + k * px(LUMEN_ROW + LUMEN_ROW_GAP);
+        RECT del = {r.right - pad - px(72), y, r.right - pad - px(12), y + px(LUMEN_ROW)};
+        POINT pt = {mx, my};
+        if (PtInRect(&del, pt)) return k;
     }
     return -1;
 }
@@ -641,6 +751,7 @@ static void ui_hot(int mx, int my) {
     for (int i = 0; i < g_nw; i++) {
         g_w[i].hot = PtInRect(&g_w[i].box, pt) ? 1 : 0;
     }
+    g_hover_row = hit_list_row(mx, my);
 }
 
 static void ui_fonts(HWND hwnd) {
@@ -648,22 +759,35 @@ static void ui_fonts(HWND hwnd) {
     if (g_font_body) DeleteObject(g_font_body);
     if (g_font_small) DeleteObject(g_font_small);
     if (g_font_btn) DeleteObject(g_font_btn);
+    if (g_font_label) DeleteObject(g_font_label);
     LOGFONTW lf;
     memset(&lf, 0, sizeof(lf));
-    lf.lfHeight = -px(32);
-    lf.lfWeight = FW_SEMIBOLD;
     lf.lfQuality = CLEARTYPE_QUALITY;
-    wcscpy(lf.lfFaceName, L"Segoe UI");
+    lf.lfCharSet = DEFAULT_CHARSET;
+    wcscpy(lf.lfFaceName, L"Segoe UI Variable Display");
+    lf.lfHeight = -px(28);
+    lf.lfWeight = FW_SEMIBOLD;
     g_font_title = CreateFontIndirectW(&lf);
-    lf.lfHeight = -px(15);
+    wcscpy(lf.lfFaceName, L"Segoe UI Variable Text");
+    lf.lfHeight = -px(14);
     lf.lfWeight = FW_NORMAL;
     g_font_body = CreateFontIndirectW(&lf);
-    lf.lfHeight = -px(13);
-    lf.lfWeight = FW_MEDIUM;
+    lf.lfHeight = -px(12);
+    lf.lfWeight = FW_NORMAL;
     g_font_small = CreateFontIndirectW(&lf);
-    lf.lfHeight = -px(14);
+    lf.lfHeight = -px(12);
+    lf.lfWeight = FW_MEDIUM;
+    g_font_label = CreateFontIndirectW(&lf);
+    lf.lfHeight = -px(13);
     lf.lfWeight = FW_SEMIBOLD;
     g_font_btn = CreateFontIndirectW(&lf);
+    if (!g_font_title || !g_font_body) {
+        wcscpy(lf.lfFaceName, L"Segoe UI");
+        lf.lfHeight = -px(28);
+        lf.lfWeight = FW_SEMIBOLD;
+        if (g_font_title) DeleteObject(g_font_title);
+        g_font_title = CreateFontIndirectW(&lf);
+    }
     (void)hwnd;
 }
 
@@ -673,6 +797,7 @@ static LRESULT CALLBACK ui_wnd(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam
         g_dpi = (int)GetDpiForWindow(hwnd);
         if (g_dpi < 96) g_dpi = 96;
         ui_fonts(hwnd);
+        SetTimer(hwnd, 1, 530, NULL);
         return 0;
     case WM_DPICHANGED: {
         g_dpi = HIWORD(wparam);
@@ -708,9 +833,51 @@ static LRESULT CALLBACK ui_wnd(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam
         EndPaint(hwnd, &ps);
         return 0;
     }
-    case WM_MOUSEMOVE:
+    case WM_MOUSEMOVE: {
+        TRACKMOUSEEVENT tme;
+        memset(&tme, 0, sizeof(tme));
+        tme.cbSize = sizeof(tme);
+        tme.dwFlags = TME_LEAVE;
+        tme.hwndTrack = hwnd;
+        TrackMouseEvent(&tme);
         ui_hot(GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam));
         InvalidateRect(hwnd, NULL, FALSE);
+        return 0;
+    }
+    case WM_MOUSELEAVE:
+        g_hover_row = -1;
+        for (int i = 0; i < g_nw; i++) g_w[i].hot = 0;
+        InvalidateRect(hwnd, NULL, FALSE);
+        return 0;
+    case WM_SETCURSOR: {
+        if (LOWORD(lparam) != HTCLIENT) break;
+        POINT pt;
+        GetCursorPos(&pt);
+        ScreenToClient(hwnd, &pt);
+        ui_hot(pt.x, pt.y);
+        if (hit_list_delete(pt.x, pt.y) >= 0) {
+            SetCursor(LoadCursor(NULL, IDC_HAND));
+            return TRUE;
+        }
+        for (int i = 0; i < g_nw; i++) {
+            if (!g_w[i].hot) continue;
+            if (g_w[i].kind == UI_FIELD) {
+                SetCursor(LoadCursor(NULL, IDC_IBEAM));
+                return TRUE;
+            }
+            if (g_w[i].kind == UI_BUTTON) {
+                SetCursor(LoadCursor(NULL, IDC_HAND));
+                return TRUE;
+            }
+        }
+        SetCursor(LoadCursor(NULL, IDC_ARROW));
+        return TRUE;
+    }
+    case WM_TIMER:
+        if (wparam == 1) {
+            g_caret = !g_caret;
+            InvalidateRect(hwnd, NULL, FALSE);
+        }
         return 0;
     case WM_LBUTTONDOWN:
         SetCapture(hwnd);
@@ -742,7 +909,7 @@ static LRESULT CALLBACK ui_wnd(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam
                 }
             }
             InvalidateRect(hwnd, NULL, FALSE);
-        } else if (wparam == VK_RETURN && g_bound) {
+        } else if (wparam == VK_RETURN) {
             ui_post_create();
             InvalidateRect(hwnd, NULL, FALSE);
         } else if (wparam == VK_F5) {
@@ -751,6 +918,7 @@ static LRESULT CALLBACK ui_wnd(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam
         }
         return 0;
     case WM_DESTROY:
+        KillTimer(hwnd, 1);
         g_running = 0;
         PostQuitMessage(0);
         return 0;

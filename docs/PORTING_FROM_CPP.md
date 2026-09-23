@@ -4,7 +4,7 @@
 
 - No header/source split — modules replace `#include` guards
 - No Rule of Three/Five — ownership is explicit
-- No template error novels — generics (WIP) with clearer diagnostics
+- No template error novels — generics monomorphize to int / text / float / per-call-site struct copies
 
 ## Classes → structs + impl
 
@@ -30,7 +30,7 @@ Destructors map to `drop` methods (deterministic destruction ADR). Scope exits r
 
 ## Templates → generics
 
-Buraaq generics are monomorphized (planned). Expect clearer errors than SFINAE.
+Buraaq generics monomorphize. Guest copies today: `min` (int), `min__text`, `min__float`, `min__Struct` with `a.lt(b)` as icmp / `buraaq_text_lt` / fcmp / `Type_lt`. Trait bounds past those four copies are still growing. Expect clearer errors than SFINAE.
 
 ## When to keep C++
 

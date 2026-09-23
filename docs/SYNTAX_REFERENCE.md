@@ -255,22 +255,21 @@ struct Point {
 
 ### 5.4 Generics
 
+Guest monomorphizes `fn min[T](a: T, b: T)` into int (`min`, icmp), text (`min__text`, `buraaq_text_lt`), float (`min__float`, fcmp), and a per-call-site struct (`min__Pair`, `Pair_lt`) when the arguments are that struct.
+
 ```buraaq
-fn first(items: text) -> text {
-    if len(items) == 0 {
-        return none
-    }
-    items
+fn min[T](a: T, b: T) -> T {
+    if a.lt(b) { a } else { b }
+}
+
+fn main() {
+    print(min(3, 7))
+    print(min("b", "a"))
+    print(min(2.5, 1.25))
 }
 ```
 
-Constraints when needed:
-
-```buraaq
-fn max[T: Comparable](a: T, b: T) -> T {
-    if a > b { a } else { b }
-}
-```
+Trait bounds past those four copies are still growing. `List[T]` / `Map[K,V]` constructors are target names; write `[1, 2]` and `{ "k": 1 }`.
 
 ---
 
@@ -642,6 +641,8 @@ handle = spawn {
 }
 handle.join()
 ```
+
+`spawn` is an OS thread. `Mutex` and `Channel` call the C runtime. Send/recv are real; cancel is not.
 
 ### 15.2 Async (opt-in)
 

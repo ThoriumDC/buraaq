@@ -4,23 +4,26 @@
 
 `buraaq build` produces a native executable via clang. Debug builds use `-O0`.
 
-- **Windows:** use LLDB or Visual Studio if the binary has debug info from clang (`-g` is not yet passed by default — track as a known limitation).
+- **Windows:** use LLDB or Visual Studio. `buraaq debug FILE.bq` passes clang `-O0 -g` and prints how to load the pretty-printers.
 - **Linux:** GDB / LLDB on the linked ELF.
 
 Source locations in **compiler diagnostics** (not the native debugger) are the supported 1.0-quality path: multi-span errors, LSP hover, go-to-definition.
 
-## Planned
+## `buraaq debug`
 
 ```bash
-buraaq debug
+buraaq debug FILE.bq
 ```
 
-will launch an installed debugger with:
+builds with clang `-O0 -g` and prints how to load the pretty-printers:
 
-- DWARF (Linux/macOS) or CodeView/PDB (Windows) from `clang -g`
-- pretty-printers for `text`, arrays, `Option`, `Result`
+- `stdlib/debug/lldb_buraaq.py` — `text` (`i8*`), `Option` / `Result` tag+payload
+- `stdlib/debug/gdb_buraaq.py` — same summaries for GDB
 
-Until that lands, compile with clang directly on the emitted `.ll` if you need `-g`.
+```text
+lldb out.exe
+(lldb) command script import stdlib/debug/lldb_buraaq.py
+```
 
 ## Runtime errors
 

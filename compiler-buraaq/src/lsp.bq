@@ -1,0 +1,192 @@
+# stdio LSP: initialize, hover, completion, diagnostics, format
+use fmt.fmt_source
+use std.io.eprintln
+use std.text.byte
+use std.text.char_of
+use std.text.concat
+use std.text.eq
+use std.text.len
+use std.text.slice
+
+extern c {
+    fn buraaq_lsp_read() -> c.text
+    fn buraaq_lsp_write(json: c.text)
+    fn buraaq_json_parse(text: c.text) -> c.text
+    fn buraaq_json_path_text(v: c.text, path: c.text) -> c.text
+    fn buraaq_json_path_int(v: c.text, path: c.text) -> int
+}
+
+fn jobj(inner: text) -> text {
+    concat(char_of(123), concat(inner, char_of(125)))
+}
+
+fn q(s: text) -> text {
+    concat(char_of(34), concat(s, char_of(34)))
+}
+
+fn kv(k: text, v: text) -> text {
+    concat(q(k), concat(":", v))
+}
+
+fn word_at(src: text, line: int, ch: int) -> text {
+    n = len(src)
+    i = 0
+    ln = 0
+    col = 0
+    while i < n {
+        if ln == line {
+            if col == ch {
+                break
+            }
+        }
+        if byte(src, i) == 10 {
+            ln = ln + 1
+            col = 0
+        } else {
+            col = col + 1
+        }
+        i = i + 1
+    }
+    a = i
+    while a > 0 {
+        c = byte(src, a - 1)
+        ok = 0
+        if c >= 65 {
+            if c <= 90 {
+                ok = 1
+            }
+        }
+        if c >= 97 {
+            if c <= 122 {
+                ok = 1
+            }
+        }
+        if c >= 48 {
+            if c <= 57 {
+                ok = 1
+            }
+        }
+        if c == 95 {
+            ok = 1
+        }
+        if ok == 1 {
+            a = a - 1
+        } else {
+            break
+        }
+    }
+    b = i
+    while b < n {
+        c = byte(src, b)
+        ok = 0
+        if c >= 65 {
+            if c <= 90 {
+                ok = 1
+            }
+        }
+        if c >= 97 {
+            if c <= 122 {
+                ok = 1
+            }
+        }
+        if c >= 48 {
+            if c <= 57 {
+                ok = 1
+            }
+        }
+        if c == 95 {
+            ok = 1
+        }
+        if ok == 1 {
+            b = b + 1
+        } else {
+            break
+        }
+    }
+    if b > a {
+        return slice(src, a, b)
+    }
+    ""
+}
+
+fn brace_diags(src: text) -> int {
+    n = len(src)
+    i = 0
+    d = 0
+    while i < n {
+        c = byte(src, i)
+        if c == 34 {
+            i = i + 1
+            while i < n {
+                if byte(src, i) == 34 {
+                    i = i + 1
+                    break
+                }
+                if byte(src, i) == 92 {
+                    i = i + 1
+                }
+                i = i + 1
+            }
+        } elif c == 123 {
+            d = d + 1
+            i = i + 1
+        } elif c == 125 {
+            d = d - 1
+            i = i + 1
+        } else {
+            i = i + 1
+        }
+    }
+    d
+}
+
+fn reply(inner: text) -> text {
+    jobj(concat(kv("jsonrpc", q("2.0")), concat(",", inner)))
+}
+
+pub fn cmd_lsp() -> int {
+    go = 1
+    doc = ""
+    while go == 1 {
+        raw = buraaq_lsp_read()
+        if eq(raw, "") {
+            go = 0
+        } else {
+            msg = buraaq_json_parse(raw)
+            method = buraaq_json_path_text(msg, "method")
+            if eq(method, "initialize") {
+                caps = jobj(concat(kv("hoverProvider", "true"), concat(",", concat(kv("completionProvider", jobj("")), concat(",", concat(kv("documentFormattingProvider", "true"), concat(",", kv("textDocumentSync", "1"))))))))
+                buraaq_lsp_write(reply(kv("result", jobj(kv("capabilities", caps)))))
+            } elif eq(method, "shutdown") {
+                buraaq_lsp_write(reply(kv("result", "null")))
+            } elif eq(method, "exit") {
+                go = 0
+            } elif eq(method, "textDocument/didOpen") {
+                doc = buraaq_json_path_text(msg, "params.textDocument.text")
+                items = "[]"
+                if brace_diags(doc) != 0 {
+                    items = concat("[", concat(jobj(kv("message", q("unbalanced braces"))), "]"))
+                }
+                buraaq_lsp_write(jobj(concat(kv("jsonrpc", q("2.0")), concat(",", concat(kv("method", q("textDocument/publishDiagnostics")), concat(",", kv("params", jobj(kv("diagnostics", items)))))))))
+            } elif eq(method, "textDocument/didChange") {
+                doc = buraaq_json_path_text(msg, "params.contentChanges.0.text")
+            } elif eq(method, "textDocument/hover") {
+                line = buraaq_json_path_int(msg, "params.position.line")
+                ch = buraaq_json_path_int(msg, "params.position.character")
+                w = word_at(doc, line, ch)
+                buraaq_lsp_write(reply(kv("result", jobj(kv("contents", q(w))))))
+            } elif eq(method, "textDocument/completion") {
+                a = jobj(kv("label", q("fn")))
+                b = jobj(kv("label", q("struct")))
+                c = jobj(kv("label", q("impl")))
+                buraaq_lsp_write(reply(kv("result", concat("[", concat(a, concat(",", concat(b, concat(",", concat(c, "]")))))))))
+            } elif eq(method, "textDocument/formatting") {
+                formatted = fmt_source(doc)
+                rng = jobj(concat(kv("start", jobj(concat(kv("line", "0"), concat(",", kv("character", "0"))))), concat(",", kv("end", jobj(concat(kv("line", "99999"), concat(",", kv("character", "0"))))))))
+                item = jobj(concat(kv("range", rng), concat(",", kv("newText", q(formatted)))))
+                buraaq_lsp_write(reply(kv("result", concat("[", concat(item, "]")))))
+            }
+        }
+    }
+    0
+}

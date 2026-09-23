@@ -1,0 +1,167 @@
+# Registry client: fetch a package from a URL or file:// tree into .buraaq/cache
+use std.fs.exists
+use std.fs.mkdir
+use std.fs.read
+use std.fs.write
+use std.io.eprintln
+use std.io.println
+use std.os.getenv
+use std.text.byte
+use std.text.char_of
+use std.text.concat
+use std.text.eq
+use std.text.len
+use std.text.slice
+
+extern c {
+    fn buraaq_index_run(root: c.text) -> int
+}
+
+fn pkg_join(a: text, b: text) -> text {
+    if len(a) == 0 {
+        return b
+    }
+    concat(a, concat("/", b))
+}
+
+fn registry_base() -> text {
+    r = getenv("BURAAQ_REGISTRY")
+    if len(r) > 0 {
+        return r
+    }
+    "https://packages.buraaq.dev"
+}
+
+pub fn cmd_fetch(url: text, dest: text) -> int {
+    if len(url) == 0 {
+        eprintln("buraaq fetch URL [DEST]")
+        return 1
+    }
+    body = call(url)
+    if len(body) == 0 {
+        eprintln(concat("buraaq fetch: empty ", url))
+        return 1
+    }
+    out = dest
+    if len(out) == 0 {
+        out = "pkg.bq"
+    }
+    write(out, body)
+    println(concat("fetched ", out))
+    0
+}
+
+fn json_str_field(raw: text, name: text) -> text {
+    q = char_of(34)
+    key = concat(q, concat(name, concat(q, ":")))
+    n = len(raw)
+    kn = len(key)
+    i = 0
+    while i + kn < n {
+        if eq(slice(raw, i, i + kn), key) {
+            j = i + kn
+            while j < n {
+                if byte(raw, j) == 32 {
+                    j = j + 1
+                } else {
+                    break
+                }
+            }
+            if byte(raw, j) == 34 {
+                j = j + 1
+                k = j
+                while k < n {
+                    if byte(raw, k) == 34 {
+                        return slice(raw, j, k)
+                    }
+                    k = k + 1
+                }
+            }
+            return ""
+        }
+        i = i + 1
+    }
+    ""
+}
+
+fn index_lookup(base: text, name: text) -> text {
+    raw = ""
+    if eq(base, "packages") {
+        if exists("packages/index.json") {
+            raw = read("packages/index.json")
+        }
+    }
+    if len(raw) == 0 {
+        raw = call(concat(base, "/index.json"))
+    }
+    if len(raw) == 0 {
+        return ""
+    }
+    json_str_field(raw, name)
+}
+
+fn pkg_url(base: text, name: text, ver: text) -> text {
+    if eq(base, "packages") {
+        return concat("packages/", concat(name, concat("/", concat(ver, "/pkg.bq"))))
+    }
+    concat(base, concat("/", concat(name, concat("/", concat(ver, "/pkg.bq")))))
+}
+
+pub fn cmd_add(name: text, src: text) -> int {
+    if len(name) == 0 {
+        eprintln("buraaq add NAME [--from URL]")
+        return 1
+    }
+    url = src
+    local_pkg = ""
+    if len(url) == 0 {
+        base = "packages"
+        if exists("packages/index.json") {
+            done = 1
+        } else {
+            base = registry_base()
+        }
+        ver = index_lookup(base, name)
+        if len(ver) > 0 {
+            cand = pkg_url(base, name, ver)
+            if exists(cand) {
+                local_pkg = cand
+            } else {
+                url = cand
+            }
+        } else {
+            url = concat(registry_base(), concat("/", concat(name, "/latest/pkg.bq")))
+        }
+    }
+    mkdir(".buraaq")
+    mkdir(".buraaq/cache")
+    dest_dir = pkg_join(".buraaq/cache", name)
+    mkdir(dest_dir)
+    dest = pkg_join(dest_dir, "pkg.bq")
+    if len(local_pkg) > 0 {
+        body = read(local_pkg)
+        if len(body) == 0 {
+            eprintln(concat("buraaq add: empty ", local_pkg))
+            return 1
+        }
+        write(dest, body)
+        url = local_pkg
+    } else {
+        code = cmd_fetch(url, dest)
+        if code != 0 {
+            return code
+        }
+    }
+    lock = concat("name = ", concat(name, concat("\nsource = ", concat(url, "\n"))))
+    write(pkg_join(dest_dir, "buraaq.lock"), lock)
+    println(concat("added ", name))
+    0
+}
+
+pub fn cmd_index(root: text) -> int {
+    dir = root
+    if len(dir) == 0 {
+        dir = "packages"
+    }
+    buraaq_index_run(dir)
+}

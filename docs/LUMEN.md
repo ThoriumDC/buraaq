@@ -10,7 +10,7 @@ use std.lumen.{app, heading, note, field, button, bind, show}
 fn main() {
     app("Harbor", 1280, 800)
     heading("Deploy jobs")
-    note("Native Lumen console for a Keel API")
+    note("A quiet console for a Keel API. Enter saves. F5 refreshes.")
     field("title", "Title")
     field("body", "Details")
     button("create", "Create job")
@@ -50,9 +50,9 @@ Limits in this runtime: 48 widgets, 64 rows, ASCII/UTF-8 field input, one window
 
 ## Look
 
-Flat, teal, no drop shadows. Segoe UI with ClearType. Per-monitor DPI. Double-buffered paint.
+Stone canvas, ink type, one teal accent for live status and focus. Segoe UI Variable (falls back to Segoe UI) with ClearType. Hairline borders, 8px corners, blinking caret, I-beam on fields. Per-monitor DPI. Double-buffered paint.
 
-This is a first native surface — not a full design-system kit (no charts, no nav split, no dark theme yet). It is meant to replace “open a browser and hope” for local operator consoles.
+Not a design-system kit (no charts, no nav split). A quiet operator console instead of a browser tab.
 
 ---
 

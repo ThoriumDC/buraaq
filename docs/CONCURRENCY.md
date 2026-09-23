@@ -2,6 +2,8 @@
 
 Buraaq concurrency is designed **from first principles**: one obvious way to run work concurrently, with the compiler choosing how — not the programmer.
 
+**Guest today:** `spawn` is an OS thread (`buraaq_thread_spawn` / `join`). `Mutex` and `Channel` call the C runtime. Send/recv are real. Cancel is not. `parallel for` and inferred CPU-vs-I/O spawn are the target model below, not the guest freeze.
+
 ## Core idea
 
 You write sequential-looking code. The compiler decides whether an operation **must block an OS thread** or **can suspend a lightweight task**.
@@ -76,6 +78,8 @@ One channel type — bounded, blocking send/recv (task-aware when in executor).
 | `RwLock[T]` | Many readers / one writer (planned) |
 
 ### Cancellation
+
+Guest send/recv and spawn are real. Cancel is not yet.
 
 ```buraaq
 token = cancel_source()

@@ -47,6 +47,11 @@ The installed compiler (`dist/buraaq`) is self-hosted:
 | `buraaq doctor` | Clang, runtime, scripting line |
 | `buraaq --version` | `buraaq 1.0.0 (self-hosted)` |
 | `buraaq -C DIR <cmd>` | Run the command in that directory |
+| `buraaq fmt FILE.bq` | Format a file |
+| `buraaq lsp` / `lsp-server` | Language server on stdio |
+| `buraaq pack` / `launch` / `ship` / `dock` | Hashed `.bur`; live dock on `:7422` |
+| `buraaq fetch` / `add` / `index` | In-tree `packages/index.json` or `BURAAQ_REGISTRY` |
+| `buraaq debug [FILE.bq]` | clang `-O0 -g` + pretty-printer hints |
 
 Legacy single-file mode still works: `buraaq build app.bq`.
 
@@ -78,7 +83,7 @@ vendor = { path = "../lib" }
 gitlib = { git = "https://github.com/org/lib.bq.git", rev = "abc123" }
 ```
 
-Resolution writes **`buraaq.lock`** with checksums for reproducible builds. Registry packages cache under `target/.buraaq/cache/`.
+`buraaq add NAME` reads in-tree `packages/index.json` first, then `BURAAQ_REGISTRY` (default URL is not a live host). Cache is `.buraaq/cache/`. Hosted `packages.buraaq.dev` is next.
 
 ## Build system
 
@@ -99,7 +104,7 @@ One official style — no `.editorconfig` wars:
 - Trim trailing whitespace
 
 ```bash
-buraaq format
+buraaq fmt src/main.bq
 ```
 
 ## Documentation
@@ -119,7 +124,7 @@ Searchable HTML generated from `pub` items in each module.
 | Dependencies | Multiple tools | `buraaq add` |
 | Build | cmake + ninja + flags | `buraaq build` |
 | Test | gtest + cmake | `buraaq test` |
-| Format | clang-format debates | `buraaq format` |
+| Format | clang-format debates | `buraaq fmt` |
 | Docs | Doxygen + setup | `buraaq doc` |
 
 ## See also

@@ -15,7 +15,7 @@ High-level map of the product compiler (`compiler-buraaq/`).
   → native executable
 ```
 
-The driver is `src/main.bq`: `new` / `run` / `build` / `test` / `doctor` / `script` / `-e` / interactive shell.
+The driver is `src/main.bq`: `new` / `run` / `build` / `test` / `doctor` / `script` / `-e` / `fmt` / `lsp` / `pack` / `ship` / `dock` / `fetch` / `add` / `index` / `debug` / interactive shell.
 
 ## Modules
 
@@ -26,7 +26,11 @@ The driver is `src/main.bq`: `new` / `run` / `build` / `test` / `doctor` / `scri
 | `src/parser.bq` | Recursive-descent AST events |
 | `src/names.bq` | Functions, params, locals, builtins |
 | `src/mir.bq` | Mid-level ops for the guest subset |
-| `src/llvm.bq` | LLVM text + signatures + typed print |
+| `src/llvm.bq` | LLVM text + signatures + typed print + generic copies |
+| `src/fmt.bq` | `buraaq fmt` |
+| `src/lsp.bq` | `buraaq lsp` / `lsp-server` |
+| `src/ship.bq` | `pack` / `launch` / `ship` / `dock` |
+| `src/pkg.bq` | `fetch` / `add` / `index` |
 | `src/main.bq` | Product CLI |
 | `boot/stage0.ll` | Clone seed (clang-link, then rebuild) |
 | `golden/` | Frozen tokens / AST / sample |

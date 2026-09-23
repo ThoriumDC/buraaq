@@ -18,7 +18,11 @@ Do not print `BURAAQ 1.0 RELEASE GATES: PASS` until A–J all pass, including a 
 - Ship `.bur` / Dock `:7422` / Land kits (`aws`, `azure`, `gcp`, `hetzner`, `bare`)
 - Compiler frontend in Buraaq: lexer, parser, names, MIR, LLVM text (M3–M10)
 - Install copies packaged `dist/buraaq` + clang sidecar
-- Self-hosted CLI: shell / `-e` / `script` / `run` / `build` / `test` / `doctor`
+- Self-hosted CLI: shell / `-e` / `script` / `run` / `build` / `test` / `doctor` / `fmt` / `lsp` / `pack` / `ship` / `dock` / `fetch` / `add` / `index` / `debug`
+- Guest generics emit int, text, float, and per-call-site struct copies (`min` / `min__text` / `min__float` / `min__Pair`); `a.lt(b)` is icmp / `buraaq_text_lt` / fcmp / `Type_lt`
+- Dock is a live accept loop on `:7422` (`GET /v1/health`, `PUT /v1/apps/:name`); pack / launch / ship PUT are real
+- Public package index is in-tree `packages/index.json` (`{"hello":"0.1.0"}`); `buraaq add hello` reads it, `buraaq index` serves it on `:7423`. Hosted `packages.buraaq.dev` is not required
+- Language-tour compile is 60/60
 - Forge (private `buraaq-play/forge`): ownership, spawn, generics, Keel ledger, pack, Hetzner land — not in this public tree
 - Compiler stress/fuzz smoke: 600 mutated programs, 400 random-byte, 10 clang compile+run
 
@@ -58,12 +62,15 @@ The **compiler** is written in Buraaq. A clone with clang links `compiler-buraaq
 ## Still hardening
 
 - Gate D 7-day fuzz elapsed time (deferred from the public 1.0.0 tag)
-- Package registry, DAP pretty-printers, channels
-- POSIX HTTPS needs OpenSSL at link; JSON is field extract, not a full DOM
-- Guest lowering of generics, trait-method dispatch, and real concurrent spawn
-- Guest float arithmetic beyond literals (literals and typed print are M25)
-- Language-tour compile is 60/60; mutex/channel/await/raw-pointer still use sequential/stub lowering (spawn is inlined)
-- Interactive `buraaq` / `-e` / `script` compile a temp `.bq` with clang (`read("-")` is one stdin line)
+- Hosted index at packages.buraaq.dev (in-tree `packages/` already resolves)
+- POSIX HTTPS with OpenSSL as the default path (WinINet already works; guest `build_auto` already passes `-lssl -lcrypto`)
+- Channel cancel (send/recv and spawn are real OS primitives)
+- Generic constraints past the four copies; tagged `Result`
+- Guest `land` / `up` / `ship --status` / `ship --stop` / `dock --bind` are thinner than [SHIP.md](SHIP.md) (pack, launch, `ship HOST`, `dock` / `dock --public` are the guest path)
+
+Measured leftover runs: 23 `1` (text), 25 `42`, 26 `127.0.0.1`, 27 `10`, 28 `99`, 29 `Hi, Asim`, 30 `3`, `min("b","a")` → `a`, `min(2.5, 1.25)` → `1.25` (`min__float`), `min(Pair{3}, Pair{8}).x` → `3` (`min__Pair` / `Pair_lt`), 39 `0.5`, 47 `worker 1`, 48 `1`, 49 `42`, 50 `42`, 51 `hello`, 53 `42`, 60 `Asim lives in NYC`. Dock `GET /v1/health` → `{"ok":true}`; `PUT /v1/apps/demo` → 201; `buraaq add hello` reads `packages/index.json`; `buraaq index` serves that file on `:7423`.
+
+`spawn` is an OS thread (`buraaq_thread_spawn` / `join`); mutex and channel call the C runtime. `?` on empty returns `null` / `0` in functions that return a value; void `main` still exits. Interactive `buraaq` / `-e` / `script` compile a temp `.bq` with clang (`read("-")` is one stdin line).
 
 ## Known grain
 

@@ -245,7 +245,7 @@ Debug profiles support:
 
 ## 10. Language Server (LSP)
 
-`buraaq lsp-server` shares frontend with compiler:
+`buraaq lsp` / `lsp-server` is a guest subcommand (stdio). It shares frontend with the compiler:
 
 | Feature | Phase reused |
 |---------|--------------|

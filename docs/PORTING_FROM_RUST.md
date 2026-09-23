@@ -15,7 +15,7 @@
 | `fn foo()` | `fn foo()` (same) |
 | `'a` lifetimes | mostly elided; regions internal |
 | `impl Trait` | traits + impl blocks |
-| Cargo | `buraaq` CLI + `buraaq.pkg` |
+| Cargo | `buraaq` CLI + `buraaq.pkg` + in-tree `packages/index.json` |
 | `unwrap()` culture | explicit `expect` in tests |
 
 ## Diagnostics

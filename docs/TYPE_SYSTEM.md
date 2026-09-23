@@ -77,6 +77,8 @@ help: specify type: `let items: List[i32] = List.new()`
 
 ## 3. Generics
 
+**Guest today:** a generic `fn min[T](a: T, b: T)` emits four copies: `min` (int / icmp), `min__text` (`buraaq_text_lt`), `min__float` (fcmp), and `min__Struct` (`Type_lt`) when the call site names a struct. Trait bounds past those copies are still growing. `List[T]` / `Map[K,V]` constructors in this section are target names; write `[1, 2]` and `{ "k": 1 }`.
+
 ### 3.1 Parametric functions and types
 
 ```buraaq

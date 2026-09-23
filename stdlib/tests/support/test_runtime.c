@@ -54,6 +54,24 @@ int main(void) {
     assert(strcmp(field, "Ada") == 0);
     free(field);
 
+    void *dom = buraaq_json_parse("{\"name\":\"Ada\",\"n\":7,\"xs\":[1,2],\"ok\":true}");
+    assert(dom != NULL);
+    assert(buraaq_json_kind(dom) == 6);
+    assert(buraaq_json_count(dom) == 4);
+    char *name = buraaq_json_field(dom, "name");
+    assert(name != NULL);
+    assert(strcmp(name, "Ada") == 0);
+    free(name);
+    void *n = buraaq_json_get(dom, "n");
+    assert(buraaq_json_as_int(n) == 7);
+    void *xs = buraaq_json_get(dom, "xs");
+    assert(buraaq_json_count(xs) == 2);
+    assert(buraaq_json_as_int(buraaq_json_item(xs, 1)) == 2);
+    char *again = buraaq_json_stringify(dom);
+    assert(again != NULL);
+    assert(strstr(again, "\"name\":\"Ada\"") != NULL);
+    free(again);
+
     char *body = buraaq_http_get_body("https://example.com");
     assert(body != NULL);
     free(body);

@@ -69,6 +69,9 @@ pub fn scan_word_is(src: text, idx: int, n: int, w: text) -> bool {
 
 pub fn scan_skip_type(src: text, idx: int, n: int) -> int {
     i = scan_skip(src, idx, n)
+    if scan_word_is(src, i, n, "dyn") {
+        i = scan_skip(src, i + 3, n)
+    }
     if byte(src, i) == 42 {
         i = scan_skip(src, i + 1, n)
         if scan_word_is(src, i, n, "mut") {

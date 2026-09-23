@@ -12,7 +12,7 @@ Compiler **written in Buraaq**. This is the product compiler. Users install `dis
 | **M21** Product compiler | **PASS** | `buraaq run golden/sample.bq` prints `5`; pack-dist does not invoke cargo |
 | **M22** Product path | **PASS** | `buraaq new hello --cli` then `buraaq run`; `module` / `loop` / `unsafe` |
 | **M23** rustc-free proof | **PASS** | `buraaq test` selftest; `scripts/selfhost-test` |
-| **M24** rustc-free clone | **PASS** | `boot/stage0.ll`; spawn inlined; trait/impl/async skipped |
+| **M24** rustc-free clone | **PASS** | `boot/stage0.ll`; spawn is an OS thread; trait body skipped; impl is `Type_method`; `dyn` vtable; Option/enum box + field-chain peek |
 | **M25** mut / float / print | **PASS** | `mut` locals; float literals; typed and multi-arg print |
 | **M26** stdlib runtime | **PASS** | runtime in stdlib; CI is `selfhost` |
 
@@ -33,6 +33,12 @@ buraaq run
 buraaq build
 buraaq doctor
 buraaq test
+buraaq fmt src/main.bq
+buraaq pack
+buraaq fetch file:///path/pkg.bq
+buraaq add hello
+buraaq index
+buraaq debug src/main.bq
 buraaq -e "println(40+2)"
 ```
 

@@ -1,8 +1,15 @@
-# std.json — JSON parse/serialize (minimal v1)
+# std.json — parse a document into a DOM, then walk or stringify it
 module std.json
 
 extern c {
-    fn buraaq_json_parse_string_field(json: c.text, key: c.text) -> c.text
+    fn buraaq_json_parse(json: c.text) -> c.text
+    fn buraaq_json_stringify(v: c.text) -> c.text
+    fn buraaq_json_field(v: c.text, key: c.text) -> c.text
+    fn buraaq_json_item(v: c.text, index: int) -> c.text
+    fn buraaq_json_as_int(v: c.text) -> int
+    fn buraaq_json_as_text(v: c.text) -> c.text
+    fn buraaq_json_kind(v: c.text) -> int
+    fn buraaq_json_count(v: c.text) -> int
 }
 
 pub struct Value {
@@ -10,7 +17,7 @@ pub struct Value {
 
     fn field(self, key: text) -> text {
         unsafe {
-            buraaq_json_parse_string_field(self.raw.to_c(), key.to_c())
+            buraaq_json_field(self.raw.to_c(), key.to_c())
         }
     }
 }

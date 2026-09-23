@@ -50,7 +50,7 @@ Legitimate-use policy; Buraaq administration cooperates with lawful agency reque
 - M25: guest skips `mut`, lowers float literals, and types `print` / `println` / `print_int` / `print_float` / `print_bool` (including `print_stress.bq`)
 - M26: `buraaq_rt.c` lives in `stdlib/runtime/`; pack/install/CI need only clang and the guest
 - `scripts/selfhost-test` / `selfhost-verify` / `pack-dist` seed from a guest binary or `boot/stage0.ll`, never from a rustc-built host
-- Guest lowering: `const` / `static` / `continue` / `defer`; `spawn` inlined; `trait` skipped; `impl` unwrapped; `async`/`await` stripped
+- Guest lowering: `const` / `static` / `continue` / `defer`; `spawn` inlined; `trait` bodies skipped; `impl` / inherent methods as `Type_method`; `async`/`await` stripped
 - MIR optimization pipeline: constant folding, DCE, CFG simplification, small-call inlining
 - `--release-fast` (`-O3` + thin LTO) and `--size` (`-Os`)
 - Cross-language benchmark suite
@@ -71,6 +71,25 @@ Legitimate-use policy; Buraaq administration cooperates with lawful agency reque
 
 ### Fixed (self-host hardening)
 
+- `print(c.get().to_text())` / `min(3,7).to_text()` walk the method chain so print is `print_str`, not a raw i32
+- `Some(x)` is a boxed tag+payload; `match` on `first(nums)` binds `n` (tour 27 prints `10`)
+- `"{self.name}"` / `"{e.address.city}"` lower as field expressions and concat
+- `a.lt(b)` writes the `icmp slt` into the condition slot; `min(0,7)` is `0`
+- `Channel.send` returns 1 so `send(42)?` is success; empty `?` is `buraaq_exit` + `unreachable` (valid in void `main`)
+- `Box[T] { }` records the struct tag; `async { await compute() }` keeps the inner value
+- `l_unsupported` rejects `yield`; `dyn Trait` is a vtable + data object
+- `spawn` / `join` call `buraaq_thread_*`; mutex and channel call the C runtime
+- Enum tuple/struct variants box tag + payload; `match` binds the payload
+- `?` on empty returns `null` / `0` when the function returns a value
+- `std.json.parse` builds a DOM; `.field` / `.item` / `.as_int` walk it
+- Guest `build_auto` links `-lssl -lcrypto` on POSIX
+- Generic functions emit `fname` (int), `fname__text`, `fname__float`, and `fname__Struct`; `a.lt(b)` is icmp / `buraaq_text_lt` / fcmp / `Type_lt`
+- Guest CLI: `fmt`, `lsp-server`, `pack` / `launch` / `ship` / `dock`, `fetch` / `add` / `index`, `debug`
+- `.bur` pack/launch; dock accept loop on `:7422`; registry client fetches `file://` or HTTP into `.buraaq/cache`
+- Public package index at `packages/index.json`; `buraaq add NAME` looks up the version, `buraaq index` serves the tree on `:7423`
+- LLDB/GDB pretty-printers in `stdlib/debug/`; `buraaq debug` builds with `-g`
+- Impl and inherent methods are `Type_method`, so two `greet` impls no longer share `@greet`; `p.greet()` calls `Person_greet`
+- `half.to_text()` on a float local reads the double slot (`buraaq_f64_to_text`); tour 39 prints `0.5` instead of `0`
 - `xs[1].to_text()` was skipped as a generic type argument, so array index tests printed a stale int; only `Type[T].new` / `.bounded` / `{` skip the brackets
 - `extern c` `...` varargs never advanced the parser, so `printf(..., ...)` grew IR until the machine ran out of RAM
 - `buraaq -C DIR run` now sets the process directory to `DIR`, so project files like `data.txt` resolve

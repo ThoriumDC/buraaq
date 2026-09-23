@@ -24,6 +24,7 @@ int32_t buraaq_text_len(const char *s);
 void buraaq_forget_length(void);
 size_t buraaq_length_of(const char *s);
 int32_t buraaq_text_eq(const char *a, const char *b);
+int32_t buraaq_text_lt(const char *a, const char *b);
 int32_t buraaq_text_byte(const char *s, int32_t i);
 char *buraaq_text_slice(const char *s, int32_t start, int32_t end);
 void buraaq_rt_set_args(int argc, char **argv);
@@ -145,8 +146,30 @@ char *buraaq_os_getenv(const char *name);
 int32_t buraaq_os_argc(void);
 char *buraaq_os_argv(int32_t index);
 
-/* --- json (minimal) --- */
+/* --- json --- */
 char *buraaq_json_parse_string_field(const char *json, const char *key);
+void *buraaq_json_parse(const char *text);
+char *buraaq_json_stringify(const void *v);
+char *buraaq_json_field(const void *v, const char *key);
+void *buraaq_json_get(const void *v, const char *key);
+void *buraaq_json_item(const void *v, int32_t index);
+int32_t buraaq_json_as_int(const void *v);
+char *buraaq_json_as_text(const void *v);
+int32_t buraaq_json_kind(const void *v);
+int32_t buraaq_json_count(const void *v);
+int32_t buraaq_json_path_int(const void *v, const char *path);
+char *buraaq_json_path_text(const void *v, const char *path);
+
+/* --- lsp framing --- */
+char *buraaq_lsp_read(void);
+void buraaq_lsp_write(const char *json);
+
+/* --- ship (.bur) --- */
+int32_t buraaq_bur_pack(const char *exe, const char *pkg, const char *out_path);
+int32_t buraaq_bur_launch(const char *bur_path);
+int32_t buraaq_http_put_file(const char *url, const char *path, const char *token);
+int32_t buraaq_dock_run(int32_t public_bind);
+int32_t buraaq_index_run(const char *root);
 
 /* --- process argv builder (no shell) --- */
 int32_t buraaq_argv_new(void);

@@ -11,6 +11,8 @@
 #include <time.h>
 
 #ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include <windows.h>
 #include <wininet.h>
 #else
@@ -143,6 +145,12 @@ int32_t buraaq_text_eq(const char *a, const char *b) {
     if (!a) a = "";
     if (!b) b = "";
     return strcmp(a, b);
+}
+
+int32_t buraaq_text_lt(const char *a, const char *b) {
+    if (!a) a = "";
+    if (!b) b = "";
+    return strcmp(a, b) < 0 ? 1 : 0;
 }
 
 int32_t buraaq_text_byte(const char *s, int32_t i) {
@@ -341,6 +349,492 @@ char *buraaq_json_parse_string_field(const char *json, const char *key) {
     while (end > p && (end[-1] == ' ' || end[-1] == '\t')) end--;
     if (end <= p) return NULL;
     return dup_range(p, end);
+}
+
+#define BQJ_NULL 0
+#define BQJ_BOOL 1
+#define BQJ_INT 2
+#define BQJ_FLOAT 3
+#define BQJ_STR 4
+#define BQJ_ARR 5
+#define BQJ_OBJ 6
+#define BQJ_MAX_DEPTH 32
+
+typedef struct BqJson BqJson;
+struct BqJson {
+    int32_t kind;
+    int32_t ival;
+    double fval;
+    char *sval;
+    BqJson **kids;
+    char **keys;
+    int32_t len;
+    int32_t cap;
+};
+
+typedef struct {
+    const char *s;
+    size_t i;
+    size_t n;
+    int err;
+    int depth;
+} BqJp;
+
+static int bqj_ws(int c) {
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+}
+
+static void bqj_skip(BqJp *p) {
+    while (p->i < p->n && bqj_ws((unsigned char)p->s[p->i])) p->i++;
+}
+
+static BqJson *bqj_new(int kind) {
+    BqJson *v = (BqJson *)calloc(1, sizeof(BqJson));
+    if (v) v->kind = kind;
+    return v;
+}
+
+static void bqj_push(BqJson *arr, BqJson *kid, char *key) {
+    if (!arr || !kid) {
+        if (key) free(key);
+        return;
+    }
+    if (arr->len >= arr->cap) {
+        int32_t ncap = arr->cap ? arr->cap * 2 : 4;
+        BqJson **nk = (BqJson **)realloc(arr->kids, (size_t)ncap * sizeof(BqJson *));
+        if (!nk) return;
+        arr->kids = nk;
+        if (arr->kind == BQJ_OBJ) {
+            char **kk = (char **)realloc(arr->keys, (size_t)ncap * sizeof(char *));
+            if (!kk) return;
+            arr->keys = kk;
+        }
+        arr->cap = ncap;
+    }
+    arr->kids[arr->len] = kid;
+    if (arr->kind == BQJ_OBJ) arr->keys[arr->len] = key;
+    arr->len++;
+}
+
+static char *bqj_str(BqJp *p);
+static BqJson *bqj_val(BqJp *p);
+
+static char *bqj_str(BqJp *p) {
+    if (p->i >= p->n || p->s[p->i] != '"') {
+        p->err = 1;
+        return NULL;
+    }
+    p->i++;
+    size_t cap = 16, len = 0;
+    char *out = (char *)malloc(cap);
+    if (!out) {
+        p->err = 1;
+        return NULL;
+    }
+    while (p->i < p->n) {
+        unsigned char c = (unsigned char)p->s[p->i++];
+        if (c == '"') {
+            out[len] = 0;
+            return out;
+        }
+        if (c == '\\') {
+            if (p->i >= p->n) break;
+            c = (unsigned char)p->s[p->i++];
+            if (c == 'n') c = '\n';
+            else if (c == 't') c = '\t';
+            else if (c == 'r') c = '\r';
+            else if (c == 'b') c = '\b';
+            else if (c == 'f') c = '\f';
+            else if (c == 'u') {
+                unsigned int cp = 0;
+                int k;
+                for (k = 0; k < 4 && p->i < p->n; k++) {
+                    char h = p->s[p->i++];
+                    cp <<= 4;
+                    if (h >= '0' && h <= '9') cp |= (unsigned)(h - '0');
+                    else if (h >= 'a' && h <= 'f') cp |= (unsigned)(h - 'a' + 10);
+                    else if (h >= 'A' && h <= 'F') cp |= (unsigned)(h - 'A' + 10);
+                    else {
+                        p->err = 1;
+                        free(out);
+                        return NULL;
+                    }
+                }
+                if (cp < 0x80) c = (unsigned char)cp;
+                else if (cp < 0x800) {
+                    if (len + 2 >= cap) {
+                        cap *= 2;
+                        char *n = (char *)realloc(out, cap);
+                        if (!n) {
+                            p->err = 1;
+                            free(out);
+                            return NULL;
+                        }
+                        out = n;
+                    }
+                    out[len++] = (char)(0xC0 | (cp >> 6));
+                    out[len++] = (char)(0x80 | (cp & 0x3F));
+                    continue;
+                } else {
+                    if (len + 3 >= cap) {
+                        cap *= 2;
+                        char *n = (char *)realloc(out, cap);
+                        if (!n) {
+                            p->err = 1;
+                            free(out);
+                            return NULL;
+                        }
+                        out = n;
+                    }
+                    out[len++] = (char)(0xE0 | (cp >> 12));
+                    out[len++] = (char)(0x80 | ((cp >> 6) & 0x3F));
+                    out[len++] = (char)(0x80 | (cp & 0x3F));
+                    continue;
+                }
+            }
+        }
+        if (len + 1 >= cap) {
+            cap *= 2;
+            char *n = (char *)realloc(out, cap);
+            if (!n) {
+                p->err = 1;
+                free(out);
+                return NULL;
+            }
+            out = n;
+        }
+        out[len++] = (char)c;
+    }
+    p->err = 1;
+    free(out);
+    return NULL;
+}
+
+static BqJson *bqj_num(BqJp *p) {
+    const char *start = p->s + p->i;
+    int is_float = 0;
+    if (p->i < p->n && (p->s[p->i] == '-' || p->s[p->i] == '+')) p->i++;
+    while (p->i < p->n && p->s[p->i] >= '0' && p->s[p->i] <= '9') p->i++;
+    if (p->i < p->n && p->s[p->i] == '.') {
+        is_float = 1;
+        p->i++;
+        while (p->i < p->n && p->s[p->i] >= '0' && p->s[p->i] <= '9') p->i++;
+    }
+    if (p->i < p->n && (p->s[p->i] == 'e' || p->s[p->i] == 'E')) {
+        is_float = 1;
+        p->i++;
+        if (p->i < p->n && (p->s[p->i] == '-' || p->s[p->i] == '+')) p->i++;
+        while (p->i < p->n && p->s[p->i] >= '0' && p->s[p->i] <= '9') p->i++;
+    }
+    BqJson *v = bqj_new(is_float ? BQJ_FLOAT : BQJ_INT);
+    if (!v) {
+        p->err = 1;
+        return NULL;
+    }
+    if (is_float) {
+        v->fval = strtod(start, NULL);
+        v->ival = (int32_t)v->fval;
+    } else {
+        v->ival = (int32_t)strtol(start, NULL, 10);
+        v->fval = (double)v->ival;
+    }
+    return v;
+}
+
+static BqJson *bqj_val(BqJp *p) {
+    bqj_skip(p);
+    if (p->err || p->i >= p->n) {
+        p->err = 1;
+        return NULL;
+    }
+    if (p->depth > BQJ_MAX_DEPTH) {
+        p->err = 1;
+        return NULL;
+    }
+    char c = p->s[p->i];
+    if (c == '"') {
+        BqJson *v = bqj_new(BQJ_STR);
+        if (!v) {
+            p->err = 1;
+            return NULL;
+        }
+        v->sval = bqj_str(p);
+        if (p->err) return v;
+        return v;
+    }
+    if (c == '{') {
+        p->i++;
+        p->depth++;
+        BqJson *v = bqj_new(BQJ_OBJ);
+        if (!v) {
+            p->err = 1;
+            return NULL;
+        }
+        bqj_skip(p);
+        if (p->i < p->n && p->s[p->i] == '}') {
+            p->i++;
+            p->depth--;
+            return v;
+        }
+        while (p->i < p->n && !p->err) {
+            bqj_skip(p);
+            char *key = bqj_str(p);
+            bqj_skip(p);
+            if (p->i >= p->n || p->s[p->i] != ':') {
+                p->err = 1;
+                free(key);
+                break;
+            }
+            p->i++;
+            BqJson *kid = bqj_val(p);
+            bqj_push(v, kid, key);
+            bqj_skip(p);
+            if (p->i < p->n && p->s[p->i] == ',') {
+                p->i++;
+                continue;
+            }
+            if (p->i < p->n && p->s[p->i] == '}') {
+                p->i++;
+                break;
+            }
+            p->err = 1;
+            break;
+        }
+        p->depth--;
+        return v;
+    }
+    if (c == '[') {
+        p->i++;
+        p->depth++;
+        BqJson *v = bqj_new(BQJ_ARR);
+        if (!v) {
+            p->err = 1;
+            return NULL;
+        }
+        bqj_skip(p);
+        if (p->i < p->n && p->s[p->i] == ']') {
+            p->i++;
+            p->depth--;
+            return v;
+        }
+        while (p->i < p->n && !p->err) {
+            BqJson *kid = bqj_val(p);
+            bqj_push(v, kid, NULL);
+            bqj_skip(p);
+            if (p->i < p->n && p->s[p->i] == ',') {
+                p->i++;
+                continue;
+            }
+            if (p->i < p->n && p->s[p->i] == ']') {
+                p->i++;
+                break;
+            }
+            p->err = 1;
+            break;
+        }
+        p->depth--;
+        return v;
+    }
+    if (c == 't' && p->i + 4 <= p->n && memcmp(p->s + p->i, "true", 4) == 0) {
+        p->i += 4;
+        BqJson *v = bqj_new(BQJ_BOOL);
+        if (v) v->ival = 1;
+        return v;
+    }
+    if (c == 'f' && p->i + 5 <= p->n && memcmp(p->s + p->i, "false", 5) == 0) {
+        p->i += 5;
+        return bqj_new(BQJ_BOOL);
+    }
+    if (c == 'n' && p->i + 4 <= p->n && memcmp(p->s + p->i, "null", 4) == 0) {
+        p->i += 4;
+        return bqj_new(BQJ_NULL);
+    }
+    if (c == '-' || c == '+' || (c >= '0' && c <= '9')) return bqj_num(p);
+    p->err = 1;
+    return NULL;
+}
+
+void *buraaq_json_parse(const char *text) {
+    if (!text) return NULL;
+    BqJp p;
+    p.s = text;
+    p.i = 0;
+    p.n = strlen(text);
+    p.err = 0;
+    p.depth = 0;
+    BqJson *v = bqj_val(&p);
+    bqj_skip(&p);
+    if (p.err || p.i != p.n) return v;
+    return v;
+}
+
+static int bqj_put(char **buf, size_t *len, size_t *cap, const char *s, size_t n) {
+    if (*len + n + 1 >= *cap) {
+        size_t ncap = *cap ? *cap : 64;
+        while (*len + n + 1 >= ncap) ncap *= 2;
+        char *nb = (char *)realloc(*buf, ncap);
+        if (!nb) return 0;
+        *buf = nb;
+        *cap = ncap;
+    }
+    memcpy(*buf + *len, s, n);
+    *len += n;
+    (*buf)[*len] = 0;
+    return 1;
+}
+
+static int bqj_puts(char **buf, size_t *len, size_t *cap, const char *s) {
+    return bqj_put(buf, len, cap, s, s ? strlen(s) : 0);
+}
+
+static void bqj_esc(char **buf, size_t *len, size_t *cap, const char *s) {
+    bqj_puts(buf, len, cap, "\"");
+    if (!s) {
+        bqj_puts(buf, len, cap, "\"");
+        return;
+    }
+    for (; *s; s++) {
+        unsigned char c = (unsigned char)*s;
+        if (c == '"' || c == '\\') {
+            char t[3] = {'\\', (char)c, 0};
+            bqj_puts(buf, len, cap, t);
+        } else if (c == '\n') {
+            bqj_puts(buf, len, cap, "\\n");
+        } else if (c == '\t') {
+            bqj_puts(buf, len, cap, "\\t");
+        } else if (c == '\r') {
+            bqj_puts(buf, len, cap, "\\r");
+        } else {
+            char t[2] = {(char)c, 0};
+            bqj_puts(buf, len, cap, t);
+        }
+    }
+    bqj_puts(buf, len, cap, "\"");
+}
+
+static void bqj_write(const BqJson *v, char **buf, size_t *len, size_t *cap) {
+    char tmp[64];
+    int32_t i;
+    if (!v) {
+        bqj_puts(buf, len, cap, "null");
+        return;
+    }
+    if (v->kind == BQJ_NULL) {
+        bqj_puts(buf, len, cap, "null");
+    } else if (v->kind == BQJ_BOOL) {
+        bqj_puts(buf, len, cap, v->ival ? "true" : "false");
+    } else if (v->kind == BQJ_INT) {
+        snprintf(tmp, sizeof(tmp), "%d", (int)v->ival);
+        bqj_puts(buf, len, cap, tmp);
+    } else if (v->kind == BQJ_FLOAT) {
+        snprintf(tmp, sizeof(tmp), "%.15g", v->fval);
+        bqj_puts(buf, len, cap, tmp);
+    } else if (v->kind == BQJ_STR) {
+        bqj_esc(buf, len, cap, v->sval);
+    } else if (v->kind == BQJ_ARR) {
+        bqj_puts(buf, len, cap, "[");
+        for (i = 0; i < v->len; i++) {
+            if (i) bqj_puts(buf, len, cap, ",");
+            bqj_write(v->kids[i], buf, len, cap);
+        }
+        bqj_puts(buf, len, cap, "]");
+    } else if (v->kind == BQJ_OBJ) {
+        bqj_puts(buf, len, cap, "{");
+        for (i = 0; i < v->len; i++) {
+            if (i) bqj_puts(buf, len, cap, ",");
+            bqj_esc(buf, len, cap, v->keys[i]);
+            bqj_puts(buf, len, cap, ":");
+            bqj_write(v->kids[i], buf, len, cap);
+        }
+        bqj_puts(buf, len, cap, "}");
+    }
+}
+
+char *buraaq_json_stringify(const void *vp) {
+    char *buf = NULL;
+    size_t len = 0, cap = 0;
+    bqj_write((const BqJson *)vp, &buf, &len, &cap);
+    if (!buf) return dup_str("null");
+    return buf;
+}
+
+void *buraaq_json_get(const void *vp, const char *key) {
+    const BqJson *v = (const BqJson *)vp;
+    int32_t i;
+    if (!v || v->kind != BQJ_OBJ || !key) return NULL;
+    for (i = 0; i < v->len; i++) {
+        if (v->keys[i] && strcmp(v->keys[i], key) == 0) return v->kids[i];
+    }
+    return NULL;
+}
+
+void *buraaq_json_item(const void *vp, int32_t index) {
+    const BqJson *v = (const BqJson *)vp;
+    if (!v || v->kind != BQJ_ARR || index < 0 || index >= v->len) return NULL;
+    return v->kids[index];
+}
+
+char *buraaq_json_field(const void *vp, const char *key) {
+    BqJson *kid = (BqJson *)buraaq_json_get(vp, key);
+    if (!kid) return NULL;
+    if (kid->kind == BQJ_STR) return dup_str(kid->sval ? kid->sval : "");
+    return buraaq_json_stringify(kid);
+}
+
+int32_t buraaq_json_as_int(const void *vp) {
+    const BqJson *v = (const BqJson *)vp;
+    if (!v) return 0;
+    if (v->kind == BQJ_INT || v->kind == BQJ_BOOL) return v->ival;
+    if (v->kind == BQJ_FLOAT) return (int32_t)v->fval;
+    if (v->kind == BQJ_STR && v->sval) return (int32_t)strtol(v->sval, NULL, 10);
+    return 0;
+}
+
+char *buraaq_json_as_text(const void *vp) {
+    const BqJson *v = (const BqJson *)vp;
+    if (!v) return NULL;
+    if (v->kind == BQJ_STR) return dup_str(v->sval ? v->sval : "");
+    return buraaq_json_stringify(v);
+}
+
+int32_t buraaq_json_kind(const void *vp) {
+    const BqJson *v = (const BqJson *)vp;
+    return v ? v->kind : BQJ_NULL;
+}
+
+int32_t buraaq_json_count(const void *vp) {
+    const BqJson *v = (const BqJson *)vp;
+    if (!v) return 0;
+    if (v->kind == BQJ_ARR || v->kind == BQJ_OBJ) return v->len;
+    return 0;
+}
+
+static const BqJson *bqj_path(const BqJson *v, const char *path) {
+    char key[128];
+    size_t k;
+    if (!v || !path) return NULL;
+    while (*path && v) {
+        k = 0;
+        while (path[k] && path[k] != '.' && k + 1 < sizeof(key)) {
+            key[k] = path[k];
+            k++;
+        }
+        key[k] = 0;
+        if (v->kind == BQJ_OBJ) v = (const BqJson *)buraaq_json_get(v, key);
+        else if (v->kind == BQJ_ARR) v = (const BqJson *)buraaq_json_item(v, (int32_t)strtol(key, NULL, 10));
+        else return NULL;
+        if (!path[k]) break;
+        path += k + 1;
+    }
+    return v;
+}
+
+int32_t buraaq_json_path_int(const void *v, const char *path) {
+    return buraaq_json_as_int(bqj_path((const BqJson *)v, path));
+}
+
+char *buraaq_json_path_text(const void *v, const char *path) {
+    return buraaq_json_as_text(bqj_path((const BqJson *)v, path));
 }
 
 #ifdef _WIN32
@@ -892,4 +1386,663 @@ int32_t buraaq_process_exit_code(const char *cmd) {
         return -1;
     }
 #endif
+}
+
+#ifndef _WIN32
+#define BUR_HDR_EQ(line) (strncasecmp((line), "Content-Length:", 15) == 0)
+#else
+#define BUR_HDR_EQ(line) (_strnicmp((line), "Content-Length:", 15) == 0)
+#endif
+
+char *buraaq_lsp_read(void) {
+    char line[256];
+    size_t need = 0;
+    for (;;) {
+        if (!fgets(line, sizeof(line), stdin)) return NULL;
+        if (line[0] == '\r' || line[0] == '\n') break;
+        if (BUR_HDR_EQ(line)) {
+            const char *p = line + 15;
+            while (*p == ' ') p++;
+            need = (size_t)strtoul(p, NULL, 10);
+        }
+    }
+    if (need == 0) return dup_str("");
+    char *buf = (char *)malloc(need + 1);
+    if (!buf) return NULL;
+    size_t got = 0;
+    while (got < need) {
+        size_t n = fread(buf + got, 1, need - got, stdin);
+        if (n == 0) break;
+        got += n;
+    }
+    buf[got] = 0;
+    return buf;
+}
+
+void buraaq_lsp_write(const char *json) {
+    if (!json) json = "{}";
+    fprintf(stdout, "Content-Length: %zu\r\n\r\n%s", strlen(json), json);
+    fflush(stdout);
+}
+
+static int bur_put_u32(FILE *fp, uint32_t v) {
+    unsigned char b[4];
+    b[0] = (unsigned char)(v & 255);
+    b[1] = (unsigned char)((v >> 8) & 255);
+    b[2] = (unsigned char)((v >> 16) & 255);
+    b[3] = (unsigned char)((v >> 24) & 255);
+    return fwrite(b, 1, 4, fp) == 4;
+}
+
+static int bur_add_file(FILE *fp, const char *name, const char *path) {
+    FILE *in;
+    long sz;
+    char *buf;
+    uint32_t nlen, dlen;
+    if (!path || !buraaq_file_exists(path)) return 0;
+    in = fopen(path, "rb");
+    if (!in) return 0;
+    if (fseek(in, 0, SEEK_END) != 0) { fclose(in); return 0; }
+    sz = ftell(in);
+    if (sz < 0) { fclose(in); return 0; }
+    rewind(in);
+    buf = (char *)malloc(sz > 0 ? (size_t)sz : 1);
+    if (!buf) { fclose(in); return 0; }
+    if (sz > 0 && fread(buf, 1, (size_t)sz, in) != (size_t)sz) {
+        free(buf);
+        fclose(in);
+        return 0;
+    }
+    fclose(in);
+    nlen = (uint32_t)strlen(name);
+    dlen = (uint32_t)sz;
+    if (!bur_put_u32(fp, nlen) || fwrite(name, 1, nlen, fp) != nlen) {
+        free(buf);
+        return 0;
+    }
+    if (!bur_put_u32(fp, dlen) || (dlen && fwrite(buf, 1, dlen, fp) != dlen)) {
+        free(buf);
+        return 0;
+    }
+    free(buf);
+    return 1;
+}
+
+int32_t buraaq_bur_pack(const char *exe, const char *pkg, const char *out_path) {
+    FILE *fp;
+    if (!exe || !out_path) return 1;
+    fp = fopen(out_path, "wb");
+    if (!fp) return 1;
+    if (fwrite("BUR1", 1, 4, fp) != 4) { fclose(fp); return 1; }
+    if (!bur_add_file(fp, "bin/app", exe)) { fclose(fp); return 1; }
+    if (pkg && buraaq_file_exists(pkg)) {
+        if (!bur_add_file(fp, "buraaq.pkg", pkg)) { fclose(fp); return 1; }
+    }
+    fclose(fp);
+    return 0;
+}
+
+static int bur_mkdir_p(const char *path) {
+    char buf[1024];
+    size_t n = strlen(path);
+    size_t i;
+    if (n >= sizeof(buf)) return 0;
+    memcpy(buf, path, n + 1);
+    for (i = 1; i < n; i++) {
+        if (buf[i] == '/' || buf[i] == '\\') {
+            char c = buf[i];
+            buf[i] = 0;
+            buraaq_mkdir(buf);
+            buf[i] = c;
+        }
+    }
+    buraaq_mkdir(buf);
+    return 1;
+}
+
+int32_t buraaq_bur_launch(const char *bur_path) {
+    FILE *fp;
+    char magic[4];
+    char dest[1024];
+    char exe[1024];
+    exe[0] = 0;
+    if (!bur_path) return 1;
+    fp = fopen(bur_path, "rb");
+    if (!fp) return 1;
+    if (fread(magic, 1, 4, fp) != 4 || memcmp(magic, "BUR1", 4) != 0) {
+        fclose(fp);
+        return 1;
+    }
+#ifdef _WIN32
+    snprintf(dest, sizeof(dest), "%s\\.buraaq\\run\\ship", getenv("USERPROFILE") ? getenv("USERPROFILE") : ".");
+#else
+    snprintf(dest, sizeof(dest), "%s/.buraaq/run/ship", getenv("HOME") ? getenv("HOME") : ".");
+#endif
+    bur_mkdir_p(dest);
+    for (;;) {
+        unsigned char nb[4];
+        uint32_t nlen, dlen;
+        char name[256];
+        char outp[1200];
+        char *data;
+        if (fread(nb, 1, 4, fp) != 4) break;
+        nlen = (uint32_t)nb[0] | ((uint32_t)nb[1] << 8) | ((uint32_t)nb[2] << 16) | ((uint32_t)nb[3] << 24);
+        if (nlen == 0 || nlen >= sizeof(name)) break;
+        if (fread(name, 1, nlen, fp) != nlen) break;
+        name[nlen] = 0;
+        if (strstr(name, "..") || name[0] == '/' || name[0] == '\\') break;
+        if (fread(nb, 1, 4, fp) != 4) break;
+        dlen = (uint32_t)nb[0] | ((uint32_t)nb[1] << 8) | ((uint32_t)nb[2] << 16) | ((uint32_t)nb[3] << 24);
+        data = (char *)malloc(dlen + 1);
+        if (!data) break;
+        if (dlen && fread(data, 1, dlen, fp) != dlen) { free(data); break; }
+        snprintf(outp, sizeof(outp), "%s/%s", dest, name);
+        {
+            char *slash = strrchr(outp, '/');
+#ifdef _WIN32
+            char *bslash = strrchr(outp, '\\');
+            if (!slash || (bslash && bslash > slash)) slash = bslash;
+#endif
+            if (slash) {
+                char c = *slash;
+                *slash = 0;
+                bur_mkdir_p(outp);
+                *slash = c;
+            }
+        }
+        {
+            FILE *out = fopen(outp, "wb");
+            if (out) {
+                if (dlen) fwrite(data, 1, dlen, out);
+                fclose(out);
+            }
+        }
+        if (strncmp(name, "bin/", 4) == 0) snprintf(exe, sizeof(exe), "%s", outp);
+        free(data);
+    }
+    fclose(fp);
+    if (!exe[0]) return 1;
+#ifdef _WIN32
+    {
+        STARTUPINFOA si;
+        PROCESS_INFORMATION pi;
+        memset(&si, 0, sizeof(si));
+        si.cb = sizeof(si);
+        memset(&pi, 0, sizeof(pi));
+        if (!CreateProcessA(exe, NULL, NULL, NULL, FALSE, 0, NULL, dest, &si, &pi)) return 1;
+        WaitForSingleObject(pi.hProcess, INFINITE);
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+        return 0;
+    }
+#else
+    {
+        pid_t pid = fork();
+        if (pid < 0) return 1;
+        if (pid == 0) {
+            char *argv[] = {exe, NULL};
+            execv(exe, argv);
+            _exit(127);
+        }
+        int st = 0;
+        waitpid(pid, &st, 0);
+        return WIFEXITED(st) ? (int32_t)WEXITSTATUS(st) : 1;
+    }
+#endif
+}
+
+#ifdef _WIN32
+int32_t buraaq_http_put_file(const char *url, const char *path, const char *token) {
+    HINTERNET ses, con, req;
+    URL_COMPONENTSA uc;
+    char host[256], extra[1024];
+    FILE *fp;
+    long sz;
+    char *body;
+    char hdr[256];
+    DWORD status = 0, slen = sizeof(status);
+    INTERNET_PORT port;
+    if (!url || !path) return 1;
+    fp = fopen(path, "rb");
+    if (!fp) return 1;
+    fseek(fp, 0, SEEK_END);
+    sz = ftell(fp);
+    rewind(fp);
+    body = (char *)malloc((size_t)(sz > 0 ? sz : 1));
+    if (!body) { fclose(fp); return 1; }
+    if (sz > 0) fread(body, 1, (size_t)sz, fp);
+    fclose(fp);
+    memset(&uc, 0, sizeof(uc));
+    uc.dwStructSize = sizeof(uc);
+    uc.lpszHostName = host;
+    uc.dwHostNameLength = sizeof(host);
+    uc.lpszUrlPath = extra;
+    uc.dwUrlPathLength = sizeof(extra);
+    if (!InternetCrackUrlA(url, 0, 0, &uc)) { free(body); return 1; }
+    port = uc.nPort;
+    ses = InternetOpenA("buraaq/1.0", INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0);
+    if (!ses) { free(body); return 1; }
+    con = InternetConnectA(ses, host, port, NULL, NULL, INTERNET_SERVICE_HTTP, 0, 0);
+    if (!con) { InternetCloseHandle(ses); free(body); return 1; }
+    req = HttpOpenRequestA(con, "PUT", extra[0] ? extra : "/", NULL, NULL, NULL,
+        INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE | (uc.nScheme == INTERNET_SCHEME_HTTPS ? INTERNET_FLAG_SECURE : 0), 0);
+    if (!req) { InternetCloseHandle(con); InternetCloseHandle(ses); free(body); return 1; }
+    snprintf(hdr, sizeof(hdr), "Authorization: Bearer %s\r\nContent-Type: application/octet-stream\r\n", token ? token : "");
+    if (!HttpSendRequestA(req, hdr, (DWORD)strlen(hdr), body, (DWORD)sz)) {
+        InternetCloseHandle(req);
+        InternetCloseHandle(con);
+        InternetCloseHandle(ses);
+        free(body);
+        return 1;
+    }
+    HttpQueryInfoA(req, HTTP_QUERY_STATUS_CODE | HTTP_QUERY_FLAG_NUMBER, &status, &slen, NULL);
+    InternetCloseHandle(req);
+    InternetCloseHandle(con);
+    InternetCloseHandle(ses);
+    free(body);
+    return status >= 200 && status < 300 ? 0 : 1;
+}
+#else
+int32_t buraaq_http_put_file(const char *url, const char *path, const char *token) {
+    (void)url;
+    (void)path;
+    (void)token;
+    return 1;
+}
+#endif
+
+#ifdef _WIN32
+typedef SOCKET bq_hsock;
+#define BQ_HINV INVALID_SOCKET
+static int bq_hclose(bq_hsock s) { return closesocket(s) == 0 ? 0 : -1; }
+#else
+typedef int bq_hsock;
+#define BQ_HINV (-1)
+static int bq_hclose(bq_hsock s) { return close(s); }
+#endif
+
+static int bq_hstart(void) {
+#ifdef _WIN32
+    static int ready = 0;
+    WSADATA wsa;
+    if (ready) return 1;
+    if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) return 0;
+    ready = 1;
+#endif
+    return 1;
+}
+
+static void bq_home_join(char *out, size_t cap, const char *rel) {
+    const char *home = getenv("HOME");
+#ifdef _WIN32
+    if (!home || !home[0]) home = getenv("USERPROFILE");
+#endif
+    if (!home || !home[0]) home = ".";
+    snprintf(out, cap, "%s/%s", home, rel);
+}
+
+static int bq_app_name_ok(const char *s) {
+    size_t i;
+    if (!s || !s[0]) return 0;
+    if (!( (s[0] >= 'A' && s[0] <= 'Z') || (s[0] >= 'a' && s[0] <= 'z') || s[0] == '_')) return 0;
+    for (i = 1; s[i]; i++) {
+        char c = s[i];
+        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '-') continue;
+        return 0;
+    }
+    return 1;
+}
+
+static int bq_tok_eq(const char *a, const char *b) {
+    size_t na = a ? strlen(a) : 0;
+    size_t nb = b ? strlen(b) : 0;
+    size_t n = na > nb ? na : nb;
+    unsigned char x = 0;
+    size_t i;
+    for (i = 0; i < n; i++) {
+        unsigned char ca = i < na ? (unsigned char)a[i] : 0;
+        unsigned char cb = i < nb ? (unsigned char)b[i] : 0;
+        x = (unsigned char)(x | (ca ^ cb));
+    }
+    return x == 0 && na == nb;
+}
+
+static void bq_dock_token(char *out, size_t cap) {
+    const char *env = getenv("BURAAQ_DOCK_TOKEN");
+    char path[1024];
+    char *got;
+    if (env && env[0]) {
+        snprintf(out, cap, "%s", env);
+        return;
+    }
+    bq_home_join(path, sizeof(path), ".buraaq/dock/token");
+    got = buraaq_file_read(path);
+    if (got && got[0]) {
+        size_t n = strlen(got);
+        while (n > 0 && (got[n - 1] == '\n' || got[n - 1] == '\r')) {
+            got[--n] = 0;
+        }
+        snprintf(out, cap, "%s", got);
+        free(got);
+        return;
+    }
+    free(got);
+    {
+        unsigned int seed = (unsigned int)time(NULL) ^ (unsigned int)(uintptr_t)out;
+        size_t i;
+        static const char hex[] = "0123456789abcdef";
+        if (cap < 33) {
+            out[0] = 0;
+            return;
+        }
+        for (i = 0; i < 32; i++) {
+            seed = seed * 1664525u + 1013904223u;
+            out[i] = hex[(seed >> 24) & 15];
+        }
+        out[32] = 0;
+    }
+    {
+        char dir[1024];
+        bq_home_join(dir, sizeof(dir), ".buraaq");
+        buraaq_mkdir(dir);
+        bq_home_join(dir, sizeof(dir), ".buraaq/dock");
+        bur_mkdir_p(dir);
+        buraaq_file_write(path, out);
+    }
+}
+
+static void bq_http_reply(bq_hsock c, int status, const char *ctype, const char *body, size_t blen) {
+    char hdr[256];
+    int n;
+    if (!body) {
+        body = "";
+        blen = 0;
+    }
+    n = snprintf(hdr, sizeof(hdr),
+        "HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %u\r\nConnection: close\r\n\r\n",
+        status, status == 200 ? "OK" : status == 201 ? "Created" : status == 204 ? "No Content" : status == 401 ? "Unauthorized" : status == 404 ? "Not Found" : "Error",
+        ctype ? ctype : "text/plain", (unsigned)blen);
+    if (n > 0) send(c, hdr, (size_t)n, 0);
+    if (blen) send(c, body, blen, 0);
+}
+
+static bq_hsock bq_listen_port(int port, int public_bind) {
+    bq_hsock fd;
+    struct sockaddr_in addr;
+    int one = 1;
+    if (!bq_hstart()) return BQ_HINV;
+    fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd == BQ_HINV) return BQ_HINV;
+    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const char *)&one, sizeof(one));
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons((unsigned short)port);
+    addr.sin_addr.s_addr = public_bind ? htonl(INADDR_ANY) : htonl(INADDR_LOOPBACK);
+    if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) != 0) {
+        bq_hclose(fd);
+        return BQ_HINV;
+    }
+    if (listen(fd, 16) != 0) {
+        bq_hclose(fd);
+        return BQ_HINV;
+    }
+    return fd;
+}
+
+static int bq_http_read(bq_hsock c, char *hdr, size_t hcap, size_t *hlen, char **body, size_t *blen) {
+    size_t n = 0;
+    int r;
+    char *sep;
+    const char *cl;
+    size_t need = 0;
+    *body = NULL;
+    *blen = 0;
+    *hlen = 0;
+    while (n + 1 < hcap) {
+        r = recv(c, hdr + n, (int)(hcap - 1 - n), 0);
+        if (r <= 0) break;
+        n += (size_t)r;
+        hdr[n] = 0;
+        sep = strstr(hdr, "\r\n\r\n");
+        if (sep) {
+            *hlen = (size_t)(sep - hdr);
+            cl = hdr;
+            while (cl && *cl) {
+                if ((cl[0] == 'C' || cl[0] == 'c') && strncmp(cl, "Content-Length:", 15) == 0) {
+                    need = (size_t)strtoul(cl + 15, NULL, 10);
+                    break;
+                }
+                if ((cl[0] == 'C' || cl[0] == 'c') && strncmp(cl, "content-length:", 15) == 0) {
+                    need = (size_t)strtoul(cl + 15, NULL, 10);
+                    break;
+                }
+                cl = strstr(cl, "\r\n");
+                if (cl) cl += 2;
+            }
+            if (need > 64u * 1024u * 1024u) return 0;
+            {
+                size_t have = n - (*hlen + 4);
+                char *buf = (char *)malloc(need + 1);
+                if (!buf) return 0;
+                if (have > need) have = need;
+                if (have) memcpy(buf, sep + 4, have);
+                while (have < need) {
+                    r = recv(c, buf + have, (int)(need - have), 0);
+                    if (r <= 0) break;
+                    have += (size_t)r;
+                }
+                buf[have] = 0;
+                *body = buf;
+                *blen = have;
+            }
+            return 1;
+        }
+    }
+    hdr[n] = 0;
+    *hlen = n;
+    return 1;
+}
+
+static int bq_nicmp(const char *a, const char *b, size_t n) {
+    size_t i;
+    for (i = 0; i < n; i++) {
+        unsigned char ca = (unsigned char)a[i];
+        unsigned char cb = (unsigned char)b[i];
+        if (ca >= 'A' && ca <= 'Z') ca = (unsigned char)(ca + 32);
+        if (cb >= 'A' && cb <= 'Z') cb = (unsigned char)(cb + 32);
+        if (ca != cb || ca == 0) return (int)ca - (int)cb;
+    }
+    return 0;
+}
+
+static const char *bq_hdr_auth(const char *hdr) {
+    const char *p = hdr;
+    while (p && *p) {
+        if ((p[0] == 'A' || p[0] == 'a') && bq_nicmp(p, "Authorization:", 14) == 0) {
+            p += 14;
+            while (*p == ' ') p++;
+            if (bq_nicmp(p, "Bearer ", 7) == 0) return p + 7;
+            return p;
+        }
+        p = strstr(p, "\r\n");
+        if (p) p += 2;
+    }
+    return "";
+}
+
+static void bq_hdr_line_end(char *s) {
+    char *p = s;
+    while (*p && *p != '\r' && *p != '\n' && *p != ' ') p++;
+    *p = 0;
+}
+
+int32_t buraaq_dock_run(int32_t public_bind) {
+    char token[128];
+    char live[1024];
+    bq_hsock fd;
+    const char *once = getenv("BURAAQ_DOCK_ONCE");
+    bq_dock_token(token, sizeof(token));
+    bq_home_join(live, sizeof(live), ".buraaq/dock/live");
+    bur_mkdir_p(live);
+    fd = bq_listen_port(7422, public_bind);
+    if (fd == BQ_HINV) {
+        fprintf(stderr, "buraaq dock: bind :7422 failed\n");
+        return 1;
+    }
+    fprintf(stderr, "buraaq dock: GET /v1/health on :7422\n");
+    fflush(stderr);
+    for (;;) {
+        bq_hsock c = accept(fd, NULL, NULL);
+        char hdr[8192];
+        size_t hlen = 0;
+        char *body = NULL;
+        size_t blen = 0;
+        char method[16];
+        char path[512];
+        const char *auth;
+        int authed;
+        if (c == BQ_HINV) {
+            if (once && once[0] == '1') break;
+            continue;
+        }
+        if (!bq_http_read(c, hdr, sizeof(hdr), &hlen, &body, &blen)) {
+            bq_http_reply(c, 400, "text/plain", "bad request", 11);
+            bq_hclose(c);
+            free(body);
+            if (once && once[0] == '1') break;
+            continue;
+        }
+        method[0] = 0;
+        path[0] = 0;
+        sscanf(hdr, "%15s %511s", method, path);
+        auth = bq_hdr_auth(hdr);
+        {
+            char abuf[128];
+            size_t i = 0;
+            while (auth[i] && auth[i] != '\r' && auth[i] != '\n' && i + 1 < sizeof(abuf)) {
+                abuf[i] = auth[i];
+                i++;
+            }
+            abuf[i] = 0;
+            authed = bq_tok_eq(abuf, token);
+        }
+        if (strcmp(method, "GET") == 0 && strcmp(path, "/v1/health") == 0) {
+            bq_http_reply(c, 200, "application/json", "{\"ok\":true}", 11);
+        } else if (strcmp(method, "GET") == 0 && strcmp(path, "/v1/apps") == 0) {
+            if (!authed) {
+                bq_http_reply(c, 401, "text/plain", "unauthorized", 12);
+            } else {
+                bq_http_reply(c, 200, "application/json", "[]", 2);
+            }
+        } else if (strncmp(path, "/v1/apps/", 9) == 0) {
+            char name[128];
+            snprintf(name, sizeof(name), "%s", path + 9);
+            bq_hdr_line_end(name);
+            if (!bq_app_name_ok(name)) {
+                bq_http_reply(c, 400, "text/plain", "bad name", 8);
+            } else if (!authed) {
+                bq_http_reply(c, 401, "text/plain", "unauthorized", 12);
+            } else if (strcmp(method, "PUT") == 0) {
+                char dest[1200];
+                char dir[1100];
+                snprintf(dir, sizeof(dir), "%s/%s", live, name);
+                bur_mkdir_p(dir);
+                snprintf(dest, sizeof(dest), "%s/%s/app.bur", live, name);
+                {
+                    FILE *fp = fopen(dest, "wb");
+                    if (!fp) {
+                        bq_http_reply(c, 500, "text/plain", "write failed", 12);
+                    } else {
+                        if (blen) fwrite(body, 1, blen, fp);
+                        fclose(fp);
+                        bq_http_reply(c, 201, "application/json", "{\"ok\":true}", 11);
+                    }
+                }
+            } else if (strcmp(method, "DELETE") == 0) {
+                char dest[1200];
+                snprintf(dest, sizeof(dest), "%s/%s/app.bur", live, name);
+                remove(dest);
+                bq_http_reply(c, 204, "text/plain", "", 0);
+            } else if (strcmp(method, "GET") == 0) {
+                char dest[1200];
+                snprintf(dest, sizeof(dest), "%s/%s/app.bur", live, name);
+                if (buraaq_file_exists(dest)) {
+                    bq_http_reply(c, 200, "application/json", "{\"ok\":true}", 11);
+                } else {
+                    bq_http_reply(c, 404, "text/plain", "not found", 9);
+                }
+            } else {
+                bq_http_reply(c, 405, "text/plain", "method not allowed", 18);
+            }
+        } else {
+            bq_http_reply(c, 404, "text/plain", "not found", 9);
+        }
+        free(body);
+        bq_hclose(c);
+        if (once && once[0] == '1') break;
+    }
+    bq_hclose(fd);
+    return 0;
+}
+
+int32_t buraaq_index_run(const char *root) {
+    bq_hsock fd;
+    const char *once = getenv("BURAAQ_INDEX_ONCE");
+    const char *base = root && root[0] ? root : "packages";
+    fd = bq_listen_port(7423, 0);
+    if (fd == BQ_HINV) {
+        fprintf(stderr, "buraaq index: bind :7423 failed\n");
+        return 1;
+    }
+    fprintf(stderr, "buraaq index: GET /index.json on :7423 from %s\n", base);
+    fflush(stderr);
+    for (;;) {
+        bq_hsock c = accept(fd, NULL, NULL);
+        char hdr[8192];
+        size_t hlen = 0;
+        char *body = NULL;
+        size_t blen = 0;
+        char method[16];
+        char path[512];
+        if (c == BQ_HINV) {
+            if (once && once[0] == '1') break;
+            continue;
+        }
+        if (!bq_http_read(c, hdr, sizeof(hdr), &hlen, &body, &blen)) {
+            bq_http_reply(c, 400, "text/plain", "bad request", 11);
+            bq_hclose(c);
+            free(body);
+            if (once && once[0] == '1') break;
+            continue;
+        }
+        free(body);
+        method[0] = 0;
+        path[0] = 0;
+        sscanf(hdr, "%15s %511s", method, path);
+        if (strcmp(method, "GET") != 0) {
+            bq_http_reply(c, 405, "text/plain", "method not allowed", 18);
+        } else {
+            const char *rel = path[0] == '/' ? path + 1 : path;
+            char full[1200];
+            char *file;
+            if (!rel[0] || strcmp(rel, "index.json") == 0) rel = "index.json";
+            if (strstr(rel, "..") || rel[0] == '/' || rel[0] == '\\') {
+                bq_http_reply(c, 400, "text/plain", "bad path", 8);
+            } else {
+                snprintf(full, sizeof(full), "%s/%s", base, rel);
+                file = buraaq_file_read(full);
+                if (!file) {
+                    bq_http_reply(c, 404, "text/plain", "not found", 9);
+                } else {
+                    const char *ct = strstr(rel, ".json") ? "application/json" : "text/plain";
+                    bq_http_reply(c, 200, ct, file, strlen(file));
+                    free(file);
+                }
+            }
+        }
+        bq_hclose(c);
+        if (once && once[0] == '1') break;
+    }
+    bq_hclose(fd);
+    return 0;
 }

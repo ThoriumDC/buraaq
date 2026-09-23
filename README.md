@@ -71,7 +71,9 @@ To prove a clone: `powershell -File scripts/selfhost-test.ps1` then `powershell 
 | `canvas` / `ink` / `flip` / `held` | Game pixels and sound (**Gfx**) | An engine you rent |
 | `hold` / `stow` / `pick` | Named columns (**Hold**) | Pandas |
 | `zeros` / `dot` / `matmul` | Numeric arrays (**Grid**) | NumPy |
-| `buraaq pack` / `ship` / `land` | Hashed `.bur` on any host | A guest Linux inside Linux |
+| `buraaq pack` / `ship` / `dock` | Hashed `.bur` + live dock on `:7422` | A guest Linux inside Linux |
+| `fn min[T]` | Int / text / float / struct copies | Template error novels |
+| `buraaq add` / `index` | In-tree `packages/index.json` | A hosted registry you must rent |
 
 Complexity stays in the compiler. Application source stays small.
 
@@ -135,6 +137,7 @@ The compiler is written in Buraaq. `dist/buraaq` is that compiler, rebuilt by it
 | `examples/` | Language-tour / engineer-suite / release-gate |
 | `benchmarks/` | Gate B vs C++ `-O2` |
 | `docs/` | Spec, stack, book |
+| `packages/` | Public in-tree index (`index.json`) + sample `hello` |
 | `editors/` | VS Code, Vim, Neovim, Sublime, Helix, Zed, JetBrains |
 | `dist/` | Packaged `buraaq` for `install.ps1` / `install.sh` |
 
@@ -143,6 +146,9 @@ buraaq build
 buraaq build --release
 buraaq build --release-fast
 buraaq check
+buraaq fmt src/main.bq
+buraaq add hello
+buraaq debug src/main.bq
 ```
 
 ---

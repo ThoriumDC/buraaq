@@ -457,3 +457,164 @@ void buraaq_rt_set_args(int argc, char **argv) {
     (void)argc;
     (void)argv;
 }
+
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <pthread.h>
+#endif
+
+typedef void (*bq_thread_fn)(void *);
+
+typedef struct {
+#ifdef _WIN32
+    HANDLE handle;
+#else
+    pthread_t handle;
+#endif
+    bq_thread_fn fn;
+    void *arg;
+} bq_thread;
+
+#ifdef _WIN32
+static DWORD WINAPI bq_thread_entry(LPVOID arg) {
+    bq_thread *t = (bq_thread *)arg;
+    t->fn(t->arg);
+    return 0;
+}
+#else
+static void *bq_thread_entry(void *arg) {
+    bq_thread *t = (bq_thread *)arg;
+    t->fn(t->arg);
+    return NULL;
+}
+#endif
+
+void *buraaq_thread_spawn(void *fn, void *arg) {
+    bq_thread *t = (bq_thread *)malloc(sizeof(*t));
+    if (!t) return NULL;
+    t->fn = (bq_thread_fn)fn;
+    t->arg = arg;
+#ifdef _WIN32
+    t->handle = CreateThread(NULL, 0, bq_thread_entry, t, 0, NULL);
+    if (!t->handle) {
+        free(t);
+        return NULL;
+    }
+#else
+    if (pthread_create(&t->handle, NULL, bq_thread_entry, t) != 0) {
+        free(t);
+        return NULL;
+    }
+#endif
+    return t;
+}
+
+void buraaq_thread_join(void *h) {
+    bq_thread *t = (bq_thread *)h;
+    if (!t) return;
+#ifdef _WIN32
+    WaitForSingleObject(t->handle, INFINITE);
+    CloseHandle(t->handle);
+#else
+    pthread_join(t->handle, NULL);
+#endif
+    free(t);
+}
+
+typedef struct {
+    int32_t *buf;
+    int cap;
+    int head;
+    int tail;
+    int count;
+#ifdef _WIN32
+    CRITICAL_SECTION mu;
+    CONDITION_VARIABLE not_empty;
+    CONDITION_VARIABLE not_full;
+#else
+    pthread_mutex_t mu;
+    pthread_cond_t not_empty;
+    pthread_cond_t not_full;
+#endif
+} bq_chan;
+
+void *buraaq_chan_new(int32_t capacity) {
+    if (capacity < 1) capacity = 1;
+    bq_chan *ch = (bq_chan *)malloc(sizeof(*ch));
+    if (!ch) return NULL;
+    ch->buf = (int32_t *)malloc((size_t)capacity * sizeof(int32_t));
+    if (!ch->buf) {
+        free(ch);
+        return NULL;
+    }
+    ch->cap = capacity;
+    ch->head = 0;
+    ch->tail = 0;
+    ch->count = 0;
+#ifdef _WIN32
+    InitializeCriticalSection(&ch->mu);
+    InitializeConditionVariable(&ch->not_empty);
+    InitializeConditionVariable(&ch->not_full);
+#else
+    pthread_mutex_init(&ch->mu, NULL);
+    pthread_cond_init(&ch->not_empty, NULL);
+    pthread_cond_init(&ch->not_full, NULL);
+#endif
+    return ch;
+}
+
+int32_t buraaq_chan_send(void *h, int32_t value) {
+    bq_chan *ch = (bq_chan *)h;
+    if (!ch) return 0;
+#ifdef _WIN32
+    EnterCriticalSection(&ch->mu);
+    while (ch->count >= ch->cap) {
+        SleepConditionVariableCS(&ch->not_full, &ch->mu, INFINITE);
+    }
+#else
+    pthread_mutex_lock(&ch->mu);
+    while (ch->count >= ch->cap) {
+        pthread_cond_wait(&ch->not_full, &ch->mu);
+    }
+#endif
+    ch->buf[ch->tail] = value;
+    ch->tail = (ch->tail + 1) % ch->cap;
+    ch->count++;
+#ifdef _WIN32
+    WakeConditionVariable(&ch->not_empty);
+    LeaveCriticalSection(&ch->mu);
+#else
+    pthread_cond_signal(&ch->not_empty);
+    pthread_mutex_unlock(&ch->mu);
+#endif
+    return 1;
+}
+
+int32_t buraaq_chan_recv(void *h) {
+    bq_chan *ch = (bq_chan *)h;
+    int32_t v = 0;
+    if (!ch) return 0;
+#ifdef _WIN32
+    EnterCriticalSection(&ch->mu);
+    while (ch->count == 0) {
+        SleepConditionVariableCS(&ch->not_empty, &ch->mu, INFINITE);
+    }
+#else
+    pthread_mutex_lock(&ch->mu);
+    while (ch->count == 0) {
+        pthread_cond_wait(&ch->not_empty, &ch->mu);
+    }
+#endif
+    v = ch->buf[ch->head];
+    ch->head = (ch->head + 1) % ch->cap;
+    ch->count--;
+#ifdef _WIN32
+    WakeConditionVariable(&ch->not_full);
+    LeaveCriticalSection(&ch->mu);
+#else
+    pthread_cond_signal(&ch->not_full);
+    pthread_mutex_unlock(&ch->mu);
+#endif
+    return v;
+}

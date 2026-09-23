@@ -1,0 +1,4 @@
+# hello 0.1.0 - sample package from the public index
+fn hello_name() -> text {
+    "hello"
+}
