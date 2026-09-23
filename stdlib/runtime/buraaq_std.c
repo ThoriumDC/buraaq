@@ -18,6 +18,7 @@
 #else
 #include <errno.h>
 #include <pthread.h>
+#include <strings.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
