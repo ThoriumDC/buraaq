@@ -26,9 +26,17 @@ hide_rustc() {
 work="${TMPDIR:-/tmp}/bq-selfhost-test"
 mkdir -p "$work"
 
+dedupe_ll_declares() {
+  local ir="$1"
+  local tmp="$ir.dedupe"
+  awk '!/^declare / || !seen[$0]++' "$ir" > "$tmp"
+  mv "$tmp" "$ir"
+}
+
 link_guest() {
   local ir="$1"
   local exe="$2"
+  case "$ir" in *.ll) dedupe_ll_declares "$ir" ;; esac
   local extra=()
   if command -v ld.lld >/dev/null 2>&1; then
     extra+=(-fuse-ld=lld)

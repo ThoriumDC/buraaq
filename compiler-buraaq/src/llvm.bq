@@ -7057,12 +7057,19 @@ fn l_emit_extern(src: text, idx: int, n: int, sink: text) -> int {
                     i = scan_skip_type(src, i, n)
                 }
             }
+            # Prelude already declares @buraaq_* and @printf. A second
+            # `declare` from `extern c` is an LLVM redefinition (CI guest2.ll).
+            skipd = 0
             if eq(fname, "printf") {
-                done = 1
-            } else {
-                l_emit(sink, "declare {rtyt} @{fname}({plist})")
-                done = 1
+                skipd = 1
             }
+            if eq(slice(fname, 0, 7), "buraaq_") {
+                skipd = 1
+            }
+            if skipd == 0 {
+                l_emit(sink, "declare {rtyt} @{fname}({plist})")
+            }
+            done = 1
         } else {
             i = i + 1
         }

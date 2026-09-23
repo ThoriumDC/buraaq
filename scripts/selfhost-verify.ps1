@@ -18,7 +18,20 @@ function Find-Clang {
     return "clang"
 }
 
+function Dedupe-LlDeclares([string]$path) {
+    $seen = New-Object 'System.Collections.Generic.HashSet[string]'
+    $out = New-Object System.Collections.Generic.List[string]
+    foreach ($line in [System.IO.File]::ReadLines($path)) {
+        if ($line.StartsWith("declare ")) {
+            if (-not $seen.Add($line)) { continue }
+        }
+        [void]$out.Add($line)
+    }
+    [System.IO.File]::WriteAllLines($path, $out)
+}
+
 function Link-Guest($ir, $exe) {
+    if ($ir -like "*.ll") { Dedupe-LlDeclares $ir }
     $libs = @("-lwininet", "-ladvapi32", "-lws2_32")
     $lld = @()
     $clangDir = Split-Path $Clang
