@@ -101,11 +101,18 @@ jobs:
       - name: Add swap (Linux)
         if: runner.os != 'Windows'
         run: |
-          sudo fallocate -l 4G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=4096
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
-          swapon --show
+          set +e
+          swapon --show || true
+          free -h || true
+          SWAP=/swapfile.buraaq
+          if [ ! -e "$SWAP" ]; then
+            sudo fallocate -l 4G "$SWAP" || sudo dd if=/dev/zero of="$SWAP" bs=1M count=4096
+            sudo chmod 600 "$SWAP"
+            sudo mkswap "$SWAP"
+          fi
+          sudo swapon "$SWAP" || true
+          swapon --show || true
+          free -h || true
       - name: Self-host tests
         if: runner.os != 'Windows'
         run: |
