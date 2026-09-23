@@ -41,7 +41,7 @@ link_guest() {
     extra+=(-fuse-ld=lld)
   fi
   "$clang_bin" -Wno-override-module -Wno-deprecated-declarations -O0 \
-    "${extra[@]}" -o "$exe" "$ir" "$RT" "$STD" -lpthread -lm
+    "${extra[@]}" -DBURAAQ_OPENSSL -o "$exe" "$ir" "$RT" "$STD" -lpthread -lm -lssl -lcrypto
   chmod +x "$exe"
 }
 
@@ -139,7 +139,7 @@ write_and_run add 5 $'fn add(a: int, b: int) -> int { a + b }\nfn main() { print
 write_and_run loop 10 $'fn main() {\n    mut n = 0\n    mut k = 0\n    while k < 5 {\n        n = n + k\n        k = k + 1\n    }\n    print(n)\n}\n'
 write_and_run match 2 $'enum Color {\n    Red\n    Blue\n}\nfn main() {\n    c = Color.Blue\n    match c {\n        Color.Red => {\n            print(1)\n        }\n        Color.Blue => {\n            print(2)\n        }\n    }\n}\n'
 write_and_run defer 19 $'fn main() {\n    defer print(9)\n    print(1)\n}\n'
-write_and_run spawn 24 $'fn tick(n: int) -> int { n + 1 }\nfn main() {\n    spawn {\n        print(2)\n    }\n    print(tick(3))\n}\n'
+write_and_run spawn 24 $'fn tick(n: int) -> int { n + 1 }\nfn main() {\n    handle = spawn {\n        print(2)\n    }\n    handle.join()\n    print(tick(3))\n}\n'
 
 export BURAAQ_RUN_OUT="$work/print-stress-run"
 printed="$("$bq" run "$ROOT/examples/release-gate/print_stress.bq")"

@@ -182,7 +182,7 @@ $stress = @(
     @{ Name = "loop"; Want = "10"; Src = "fn main() {`n    mut n = 0`n    mut k = 0`n    while k < 5 {`n        n = n + k`n        k = k + 1`n    }`n    print(n)`n}`n" },
     @{ Name = "match"; Want = "2"; Src = "enum Color {`n    Red`n    Blue`n}`nfn main() {`n    c = Color.Blue`n    match c {`n        Color.Red => {`n            print(1)`n        }`n        Color.Blue => {`n            print(2)`n        }`n    }`n}`n" },
     @{ Name = "defer"; Want = "19"; Src = "fn main() {`n    defer print(9)`n    print(1)`n}`n" },
-    @{ Name = "spawn"; Want = "24"; Src = "fn tick(n: int) -> int { n + 1 }`nfn main() {`n    spawn {`n        print(2)`n    }`n    print(tick(3))`n}`n" }
+    @{ Name = "spawn"; Want = "24"; Src = "fn tick(n: int) -> int { n + 1 }`nfn main() {`n    handle = spawn {`n        print(2)`n    }`n    handle.join()`n    print(tick(3))`n}`n" }
 )
 foreach ($case in $stress) {
     $src = Join-Path $Work ($case.Name + ".bq")
