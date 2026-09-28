@@ -2,7 +2,9 @@
 
 [![Release](https://img.shields.io/github/v/release/ThoriumDC/buraaq)](https://github.com/ThoriumDC/buraaq/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-22d3ee.svg)](LICENSE)
-
+<p align="center">
+  <img src="docs/buraaq_logo.png" alt="Buraaq Logo" width="300">
+</p>
 **Write like Python. Run like C.**
 
 A self-hosted systems language from **Thorium DC**. You write `.bq`. LLVM emits a native binary. There is no garbage collector, and the default path is AOT (no Docker required). Optional `buraaq` / `-e` / `script` compile a snippet with clang for a fast edit loop — same language, not a second dialect. Unique `std.*` names import themselves.
